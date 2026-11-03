@@ -204,36 +204,47 @@
       const dpr = this.dpr, W = this.w, H = this.h, rh = this.rowH, cw = this.colW, kw = this.keyW;
       const color = this.track.color;
       if (this.rangeLbl) this.rangeLbl.textContent = U.noteName(this.base) + '–' + U.noteName(this.base + this.rows - 1);
+      const T = BBB.THEME;
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
-      // rows
+      // manuscript rows
       for (let r = 0; r < this.rows; r++) {
         const note = this.base + this.rows - 1 - r, y = r * rh;
         const black = U.isBlackKey(note);
-        g.fillStyle = black ? '#15161a' : '#1c1e23';
+        g.fillStyle = black ? T.paperDeep : T.paper;
         g.fillRect(kw, y, W - kw, rh);
-        // keyboard
-        g.fillStyle = this.keyDown === note ? color : black ? '#2a2c33' : '#d9dbe0';
-        g.fillRect(0, y + 0.5, kw - 3, rh - 1);
+        g.fillStyle = T.rule;
+        g.fillRect(kw, Math.round(y + rh) - 0.5, W - kw, note % 12 === 0 ? 1.5 : 0.5);
+        if (note % 12 === 0) { g.fillStyle = T.ruleStrong; g.fillRect(kw, Math.round(y + rh) - 1, W - kw, 1); }
+      }
+      // keyboard: ivory & ebony
+      g.fillStyle = T.ivory; g.fillRect(0, 0, kw - 3, H);
+      for (let r = 0; r < this.rows; r++) {
+        const note = this.base + this.rows - 1 - r, y = r * rh;
+        const black = U.isBlackKey(note);
+        if (this.keyDown === note) { g.fillStyle = color; g.fillRect(0, y + 0.5, kw - 3, rh - 1); }
+        else if (black) { g.fillStyle = T.ebony; g.fillRect(0, y + 1, (kw - 3) * 0.62, rh - 2); }
+        g.fillStyle = T.rule;
+        if (!black && !U.isBlackKey(note + 1)) g.fillRect(0, y, kw - 3, 1);
         if (note % 12 === 0) {
-          g.fillStyle = this.keyDown === note ? '#000' : '#555';
-          g.font = `600 ${Math.min(10, rh - 1)}px -apple-system, "SF Pro Text", sans-serif`;
-          g.textBaseline = 'middle';
-          g.fillText(U.noteName(note), 4, y + rh / 2 + 0.5);
-          g.fillStyle = 'rgba(255,255,255,0.10)';
-          g.fillRect(kw, y + rh - 1, W - kw, 1);
+          g.fillStyle = this.keyDown === note ? T.ivory : T.ink;
+          g.font = `italic ${Math.min(11, rh)}px ${T.serif}`;
+          g.textBaseline = 'middle'; g.textAlign = 'right';
+          g.fillText(U.noteName(note), kw - 6, y + rh / 2 + 0.5);
+          g.textAlign = 'left';
         }
       }
-      // columns
+      g.fillStyle = T.ink; g.fillRect(kw - 3, 0, 1.5, H);
+      // bar lines
       for (let s = 0; s <= 16; s++) {
-        g.fillStyle = s % 4 === 0 ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.05)';
-        g.fillRect(Math.round(kw + s * cw), 0, 1, H);
+        g.fillStyle = s % 4 === 0 ? T.ruleStrong : T.rule;
+        g.fillRect(Math.round(kw + s * cw), 0, s % 4 === 0 ? 1.25 : 0.75, H);
       }
       if (this.ph != null) {
-        g.fillStyle = 'rgba(255,255,255,0.07)';
+        g.fillStyle = 'rgba(201,164,86,0.22)';
         g.fillRect(kw + this.ph * cw, 0, cw, H);
       }
-      // notes
+      // notes as ink strokes
       const hidden = { up: new Set(), down: new Set() };
       this.track.notes.forEach((n) => {
         if (n.note < this.base) { for (let s = n.step; s < n.step + n.len; s++) hidden.down.add(s); return; }
@@ -241,17 +252,18 @@
         const x = this.xOf(n.step) + 1.5, y = this.yOf(n.note) + 1, w = n.len * cw - 3, h = rh - 2;
         const playing = this.ph != null && this.ph >= n.step && this.ph < n.step + n.len;
         g.fillStyle = color;
-        g.globalAlpha = playing ? 1 : 0.82;
-        roundRect(g, x, y, w, h, Math.min(3, h / 2));
+        g.globalAlpha = playing ? 1 : 0.88;
+        roundRect(g, x, y, w, h, Math.min(h / 2, 5));
         g.fill();
         g.globalAlpha = 1;
-        g.fillStyle = 'rgba(0,0,0,0.35)';
-        g.fillRect(x + w - 4, y + 2, 2, h - 4);
+        g.strokeStyle = T.ink; g.lineWidth = playing ? 1.4 : 0.8; g.stroke();
+        g.fillStyle = 'rgba(251,245,230,0.7)';
+        g.fillRect(x + w - 5, y + 2, 1.5, h - 4);
         if (w > 26 && h >= 9) {
-          g.fillStyle = 'rgba(0,0,0,0.75)';
-          g.font = `600 ${Math.min(9, h - 2)}px -apple-system, sans-serif`;
+          g.fillStyle = T.ivory;
+          g.font = `italic 600 ${Math.min(11, h)}px ${T.serif}`;
           g.textBaseline = 'middle';
-          g.fillText(U.noteName(n.note), x + 4, y + h / 2 + 0.5);
+          g.fillText(U.noteName(n.note), x + 5, y + h / 2 + 0.5);
         }
       });
       g.fillStyle = color;

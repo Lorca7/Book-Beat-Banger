@@ -5,9 +5,9 @@
 
   class LfoPanel {
     constructor(host) {
-      this.el = BBB.el('div', { class: 'panel lfos' });
+      this.el = BBB.el('div', { class: 'panel lfos leather binding-green' });
       this.el.appendChild(BBB.el('div', { class: 'panel-head' }, [
-        BBB.el('div', { class: 'panel-title', text: 'LFO' }),
+        BBB.el('div', { class: 'panel-title', html: '<span class="orn">❧</span> Modulation' }),
         BBB.el('div', { class: 'hint', text: 'drag ◉ onto any knob · drag a target ↔ for depth' })
       ]));
       const grid = BBB.el('div', { class: 'lfo-grid' });
@@ -130,7 +130,7 @@
           };
           show();
           const chip = BBB.el('div', { class: 'chip', title: p.fullName + '\nDrag ↔ to set depth · Double-click = 25% · × removes' }, [
-            bar, BBB.el('span', { class: 'chip-name', text: p.fullName, style: { color: p.trackColor || p.color } }), val,
+            bar, BBB.el('span', { class: 'chip-name', text: p.fullName, style: { color: p.trackColor || (BBB.TRACKS.some((t) => t.id === p.group) ? p.color : BBB.THEME.ink) } }), val,
             BBB.el('button', { class: 'x', text: '×', title: 'Remove', onclick: (e) => { e.stopPropagation(); BBB.removeMod(i, m.param); } })
           ]);
           let sx = 0, sd = 0, drag = false;
@@ -158,25 +158,25 @@
       const now = eng.ctx.currentTime;
       const beats = eng.beatsAt(now), secs = eng.secsAt(now);
       this.cards.forEach((c, i) => {
-        const cv = c.scope, g = cv.getContext('2d');
+        const cv = c.scope, g = cv.getContext('2d'), T = BBB.THEME;
         const W = cv.width, H = cv.height, color = BBB.LFO_COLORS[i];
         g.clearRect(0, 0, W, H);
-        g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(0, H / 2, W, 1);
-        // show the last ~1 cycle (or 2s) of the waveform scrolling
+        g.fillStyle = T.paper; g.fillRect(0, 0, W, H);
+        g.fillStyle = T.rule; g.fillRect(0, H / 2, W, 1.5);
         const L = S.lfos[i];
         const per = L.sync ? BBB.LFO_DIVS[Math.round(BBB.param(`lfo${i}.div`).value)][1] : 1 / BBB.param(`lfo${i}.hz`).value;
         const span = Math.min(per * 2, L.sync ? 64 : 8);
-        g.strokeStyle = color; g.lineWidth = 2; g.beginPath();
+        g.strokeStyle = color; g.lineWidth = 4; g.lineJoin = 'round'; g.beginPath();
         for (let x = 0; x <= W; x += 2) {
           const back = (1 - x / W) * span;
           const v = L.sync ? BBB.lfoValue(i, beats - back, secs) : BBB.lfoValue(i, beats, secs - back);
-          const y = H / 2 - v * (H / 2 - 4);
+          const y = H / 2 - v * (H / 2 - 8);
           if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
         }
         g.stroke();
         const v = BBB.lfoValue(i, beats, secs);
-        g.fillStyle = '#fff';
-        g.beginPath(); g.arc(W - 4, H / 2 - v * (H / 2 - 4), 3.5, 0, Math.PI * 2); g.fill();
+        g.fillStyle = T.ink;
+        g.beginPath(); g.arc(W - 7, H / 2 - v * (H / 2 - 8), 6, 0, Math.PI * 2); g.fill();
       });
     }
   }

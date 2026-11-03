@@ -12,12 +12,14 @@
       this.touching = false;
     }
     toNorm(v) {
+      if (this.curve === 'pow') return U.clamp(Math.sqrt((v - this.min) / (this.max - this.min)), 0, 1);
       if (this.curve === 'exp') return U.clamp(Math.log(v / this.min) / Math.log(this.max / this.min), 0, 1);
       return U.clamp((v - this.min) / (this.max - this.min), 0, 1);
     }
     fromNorm(n) {
       n = U.clamp(n, 0, 1);
       if (this.steps > 1) n = Math.round(n * (this.steps - 1)) / (this.steps - 1);
+      if (this.curve === 'pow') return this.min + n * n * (this.max - this.min);
       return this.curve === 'exp' ? this.min * Math.pow(this.max / this.min, n) : this.min + n * (this.max - this.min);
     }
     get value() { return this.fromNorm(this.norm); }
@@ -40,13 +42,13 @@
 
   // ---------------- Tracks ----------------
   const TRACKS = [
-    { id: 'kick', name: 'KICK', short: 'K', kind: 'drum', color: '#ff5a36' },
-    { id: 'snare', name: 'SNARE', short: 'S', kind: 'drum', color: '#ffc233' },
-    { id: 'hat', name: 'HI-HAT', short: 'H', kind: 'drum', color: '#3ee0c5' },
-    { id: 'gran', name: 'GRANULAR', short: 'G', kind: 'granular', color: '#b67cff' }
+    { id: 'kick', name: 'KICK', title: 'Kick', numeral: 'I', short: 'K', kind: 'drum', color: '#b8432c' },
+    { id: 'snare', name: 'SNARE', title: 'Snare', numeral: 'II', short: 'S', kind: 'drum', color: '#b5862a' },
+    { id: 'hat', name: 'HI-HAT', title: 'Hi-Hat', numeral: 'III', short: 'H', kind: 'drum', color: '#2f7d68' },
+    { id: 'gran', name: 'GRANULAR', title: 'Granular', numeral: 'IV', short: 'G', kind: 'granular', color: '#7a4f9e' }
   ];
   BBB.TRACKS = TRACKS;
-  const LFO_COLORS = ['#4aa8ff', '#ff5fa2', '#9be15d', '#f2e9c9'];
+  const LFO_COLORS = ['#4b69b8', '#b8395a', '#7d9a2f', '#9a6434'];
   BBB.LFO_COLORS = LFO_COLORS;
 
   const pan = (v) => (Math.abs(v) < 0.02 ? 'C' : (v < 0 ? 'L' : 'R') + Math.round(Math.abs(v) * 100));
@@ -65,16 +67,35 @@
   });
   {
     const g = { group: 'gran', groupLabel: 'GRAN', color: TRACKS[3].color };
-    def({ ...g, id: 'gran.pitch', label: 'PITCH', min: -24, max: 24, def: 0, fmt: semis });
+    const cents = (v) => (v >= 0 ? '+' : '') + Math.round(v) + 'ct';
+    const bip = (v) => (v >= 0 ? '+' : '') + Math.round(v * 100) + '%';
+    // cloud
     def({ ...g, id: 'gran.pos', label: 'POSITION', min: 0, max: 1, def: 0.25, fmt: U.fmtPct });
     def({ ...g, id: 'gran.scan', label: 'SCAN', min: -2, max: 2, def: 0.1, fmt: (v) => (v >= 0 ? '+' : '') + v.toFixed(2) + 'x' });
-    def({ ...g, id: 'gran.size', label: 'GRAIN', min: 0.01, max: 0.5, def: 0.09, curve: 'exp', fmt: U.fmtSec });
-    def({ ...g, id: 'gran.dens', label: 'DENSITY', min: 2, max: 80, def: 24, curve: 'exp', fmt: (v) => v.toFixed(v < 10 ? 1 : 0) + '/s' });
-    def({ ...g, id: 'gran.spray', label: 'SPRAY', min: 0, max: 1, def: 0.08, fmt: U.fmtPct });
+    def({ ...g, id: 'gran.spray', label: 'SPRAY', min: 0, max: 1, def: 0.08, curve: 'pow', fmt: U.fmtPct });
+    def({ ...g, id: 'gran.dens', label: 'DENSITY', min: 1, max: 120, def: 24, curve: 'exp', fmt: (v) => v.toFixed(v < 10 ? 1 : 0) + '/s' });
+    def({ ...g, id: 'gran.jitter', label: 'JITTER', min: 0, max: 1, def: 0.15, fmt: U.fmtPct });
+    // grain
+    def({ ...g, id: 'gran.size', label: 'SIZE', min: 0.005, max: 1, def: 0.09, curve: 'exp', fmt: U.fmtSec });
+    def({ ...g, id: 'gran.sizernd', label: 'SIZE ±', min: 0, max: 1, def: 0, fmt: U.fmtPct });
+    def({ ...g, id: 'gran.skew', label: 'SKEW', min: -1, max: 1, def: 0, fmt: bip });
+    def({ ...g, id: 'gran.reverse', label: 'REVERSE', min: 0, max: 1, def: 0, fmt: U.fmtPct });
+    // pitch
+    def({ ...g, id: 'gran.pitch', label: 'PITCH', min: -24, max: 24, def: 0, fmt: semis });
+    def({ ...g, id: 'gran.fine', label: 'FINE', min: -100, max: 100, def: 0, fmt: cents });
+    def({ ...g, id: 'gran.detune', label: 'SCATTER', min: 0, max: 24, def: 0.06, curve: 'pow', fmt: (v) => (v < 1 ? Math.round(v * 100) + 'ct' : '±' + v.toFixed(1) + 'st') });
+    // voice envelope
+    def({ ...g, id: 'gran.attack', label: 'ATTACK', min: 0.002, max: 4, def: 0.04, curve: 'exp', fmt: U.fmtSec });
+    def({ ...g, id: 'gran.decay', label: 'DECAY', min: 0.01, max: 4, def: 0.4, curve: 'exp', fmt: U.fmtSec });
+    def({ ...g, id: 'gran.sustain', label: 'SUSTAIN', min: 0, max: 1, def: 0.8, fmt: U.fmtPct });
+    def({ ...g, id: 'gran.release', label: 'RELEASE', min: 0.01, max: 8, def: 0.5, curve: 'exp', fmt: U.fmtSec });
+    // voice filter
+    def({ ...g, id: 'gran.cutoff', label: 'CUTOFF', min: 40, max: 20000, def: 20000, curve: 'exp', fmt: U.fmtHz });
+    def({ ...g, id: 'gran.res', label: 'RESO', min: 0.3, max: 18, def: 0.7, curve: 'exp', fmt: (v) => v.toFixed(1) });
+    def({ ...g, id: 'gran.fenv', label: 'ENV AMT', min: -1, max: 1, def: 0, fmt: (v) => (v >= 0 ? '+' : '') + (v * 6).toFixed(1) + 'oct' });
+    // output
     def({ ...g, id: 'gran.spread', label: 'SPREAD', min: 0, max: 1, def: 0.5, fmt: U.fmtPct });
-    def({ ...g, id: 'gran.detune', label: 'DETUNE', min: 0, max: 1, def: 0.06, fmt: (v) => Math.round(v * 100) + 'ct' });
-    def({ ...g, id: 'gran.attack', label: 'ATTACK', min: 0.002, max: 2, def: 0.04, curve: 'exp', fmt: U.fmtSec });
-    def({ ...g, id: 'gran.release', label: 'RELEASE', min: 0.01, max: 4, def: 0.5, curve: 'exp', fmt: U.fmtSec });
+    def({ ...g, id: 'gran.amprnd', label: 'AMP ±', min: 0, max: 1, def: 0, fmt: U.fmtPct });
   }
 
   // ---------------- Effects ----------------
@@ -85,7 +106,7 @@
     { id: 'reverb', name: 'REVERB', params: ['fx.reverb.size', 'fx.reverb.damp'] }
   ];
   {
-    const g = (fx) => ({ group: 'fx', groupLabel: fx, color: '#d8dbe2', audio: true });
+    const g = (fx) => ({ group: 'fx', groupLabel: fx, color: '#e6c77d', audio: true });
     def({ ...g('DRIVE'), id: 'fx.drive.amt', label: 'AMOUNT', min: 0, max: 1, def: 0.45, fmt: U.fmtPct });
     def({ ...g('DRIVE'), id: 'fx.drive.tone', label: 'TONE', min: 400, max: 18000, def: 7000, curve: 'exp', fmt: U.fmtHz });
     def({ ...g('FILTER'), id: 'fx.filter.cut', label: 'CUTOFF', min: 30, max: 18000, def: 1200, curve: 'exp', fmt: U.fmtHz });
@@ -104,8 +125,8 @@
   }
 
   // ---------------- Master ----------------
-  def({ id: 'master.vol', group: 'master', groupLabel: 'MASTER', label: 'VOLUME', min: 0, max: 1.2, def: 0.85, fmt: level, audio: true, color: '#ffffff' });
-  def({ id: 'master.swing', group: 'master', groupLabel: 'MASTER', label: 'SWING', min: 0, max: 0.7, def: 0, fmt: U.fmtPct, color: '#ffffff' });
+  def({ id: 'master.vol', group: 'master', groupLabel: 'MASTER', label: 'VOLUME', min: 0, max: 1.2, def: 0.85, fmt: level, audio: true, color: '#e6c77d' });
+  def({ id: 'master.swing', group: 'master', groupLabel: 'MASTER', label: 'SWING', min: 0, max: 0.7, def: 0, fmt: U.fmtPct, color: '#e6c77d' });
 
   // ---------------- LFOs ----------------
   BBB.LFO_DIVS = [
@@ -135,8 +156,11 @@
     lfos: [0, 1, 2, 3].map((i) => ({ shape: ['sine', 'tri', 'sh', 'drift'][i], sync: true })),
     mods: [], // {lfo, param, depth}
     auto: { rec: false, bars: 1, lanes: {} }, // lanes: id -> Float32Array (normalized)
-    fx: { filterType: 'lowpass' }
+    fx: { filterType: 'lowpass' },
+    gran: { window: 'hann', quant: 'off', freeze: false }
   });
+  BBB.GRAIN_WINDOWS = [['hann', 'HANN'], ['gauss', 'GAUSS'], ['tri', 'TRIANGLE'], ['tukey', 'PLATEAU'], ['perc', 'PLUCK'], ['swell', 'SWELL'], ['rect', 'GATE']];
+  BBB.PITCH_QUANT = [['off', 'FREE'], ['semi', 'SEMITONE'], ['fifth', 'FIFTHS'], ['oct', 'OCTAVES'], ['penta', 'PENTATONIC'], ['minor', 'MINOR']];
   BBB.AUTO_RES = 16; // automation points per beat (64 per bar)
 
   // Default pattern

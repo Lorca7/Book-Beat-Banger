@@ -4,6 +4,18 @@
   const BBB = (window.BBB = window.BBB || {});
   const U = (BBB.util = {});
 
+  // Library palette shared by the canvas drawings (CSS mirrors these as custom properties).
+  BBB.THEME = {
+    paper: '#f1e6cc', paperDeep: '#e6d5ae', paperShade: '#d9c495',
+    ink: '#33241a', inkSoft: 'rgba(51,36,26,0.55)', rule: 'rgba(51,36,26,0.14)', ruleStrong: 'rgba(51,36,26,0.32)',
+    shade: 'rgba(60,40,22,0.30)', gold: '#c9a456', goldDeep: '#8a6a2a', ivory: '#fbf5e6', ebony: '#2a1f17',
+    oxblood: '#5a1d18', marker: '#a8322a',
+    serif: '"EB Garamond", "Iowan Old Style", Baskerville, Georgia, serif',
+    fell: '"IM Fell English", "EB Garamond", Georgia, serif',
+    type: '"Courier Prime", "American Typewriter", "Courier New", monospace',
+    gran: '#7a4f9e'
+  };
+
   U.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   U.lerp = (a, b, t) => a + (b - a) * t;
   U.dbToGain = (db) => Math.pow(10, db / 20);

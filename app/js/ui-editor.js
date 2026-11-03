@@ -7,14 +7,14 @@
     constructor(host) {
       this.ti = 0;
       this.vs = 0; this.ve = 1; // view window (seconds)
-      const el = (this.el = BBB.el('div', { class: 'panel editor' }));
+      const el = (this.el = BBB.el('div', { class: 'panel editor leather binding-oxblood' }));
       // header
-      this.tabs = S.tracks.map((t, i) => BBB.el('button', { class: 'tab', style: { '--c': t.color }, text: t.name, onclick: () => this.select(i) }));
+      this.tabs = S.tracks.map((t, i) => BBB.el('button', { class: 'tab', style: { '--c': t.color }, text: t.title, title: 'Chapter ' + t.numeral + ' — ' + t.title, onclick: () => this.select(i) }));
       this.info = BBB.el('div', { class: 'ed-info' });
       this.fileIn = BBB.el('input', { type: 'file', accept: 'audio/*,.wav,.mp3,.m4a,.aif,.aiff,.flac,.ogg', style: { display: 'none' } });
       this.fileIn.addEventListener('change', () => { if (this.fileIn.files[0]) BBB.loadFileIntoTrack(this.ti, this.fileIn.files[0]); this.fileIn.value = ''; });
       el.appendChild(BBB.el('div', { class: 'panel-head' }, [
-        BBB.el('div', { class: 'panel-title', text: 'SAMPLE' }), BBB.el('div', { class: 'tabs' }, this.tabs),
+        BBB.el('div', { class: 'panel-title', html: '<span class="orn">❧</span> Sample' }), BBB.el('div', { class: 'tabs' }, this.tabs),
         BBB.el('div', { class: 'head-btns' }, [
           BBB.el('button', { class: 'btn tiny', text: 'LOAD…', title: 'Load an audio file into this track (or drop one on the waveform)', onclick: () => this.fileIn.click() }),
           BBB.el('button', { class: 'btn tiny', text: 'FACTORY', title: 'Restore the factory sound', onclick: () => this.restoreFactory() }),
@@ -24,7 +24,7 @@
       ]));
       // canvas
       this.canvas = BBB.el('canvas', { class: 'wave' });
-      this.drop = BBB.el('div', { class: 'wave-wrap' }, [this.canvas, this.info, BBB.el('div', { class: 'wave-hint', text: 'Drop an audio file here' })]);
+      this.drop = BBB.el('div', { class: 'wave-wrap page' }, [this.canvas, this.info, BBB.el('div', { class: 'wave-hint', text: 'Drop an audio file here' })]);
       el.appendChild(this.drop);
       // record row
       this.recBtn = BBB.el('button', { class: 'btn rec', title: 'Record into this track (R)', onclick: () => this.toggleRec() }, [BBB.el('span', { class: 'rec-dot' }), BBB.el('span', { class: 'lbl', text: 'REC' })]);
@@ -45,7 +45,7 @@
       this.revBtn = BBB.el('button', { class: 'btn toggle', text: 'REVERSE', onclick: () => { this.slot.reverse = !this.slot.reverse; this.slot.process(); } });
       const self = this;
       this.gainModel = {
-        label: 'GAIN', color: '#e6e6e6', defNorm: 0.5,
+        label: 'GAIN', color: '#e6c77d', defNorm: 0.5,
         get norm() { return self.slot ? (self.slot.gainDb + 24) / 48 : 0.5; },
         setNorm(n) { if (!self.slot) return; self.slot.gainDb = Math.round((n * 48 - 24) * 2) / 2; self.slot.process(); },
         format() { return (self.slot && self.slot.gainDb > 0 ? '+' : '') + (self.slot ? self.slot.gainDb.toFixed(1) : '0') + 'dB'; }
@@ -305,24 +305,27 @@
 
     draw(eng) {
       const g = this.canvas.getContext('2d');
-      const W = this.w, H = this.h;
+      const W = this.w, H = this.h, T = BBB.THEME;
       if (!W) return;
       g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       g.clearRect(0, 0, W, H);
-      g.fillStyle = '#0c0d10'; g.fillRect(0, 0, W, H);
+      // parchment page with faint ruled lines
+      g.fillStyle = T.paper; g.fillRect(0, 0, W, H);
+      g.fillStyle = T.rule;
+      for (let y = 26; y < H - 14; y += 14) g.fillRect(0, y, W, 0.6);
       const color = this.track.color;
-      const top = 20, bot = H - 14, mid = (top + bot) / 2, amp = (bot - top) / 2 - 2;
-      g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(0, mid, W, 1);
+      const top = 20, bot = H - 16, mid = (top + bot) / 2, amp = (bot - top) / 2 - 2;
+      g.fillStyle = T.ruleStrong; g.fillRect(0, mid, W, 0.8);
       const mic = BBB.mic;
       if (mic.state !== 'idle') { this.drawLive(g, W, top, bot, mid, amp, color); return; }
       const s = this.slot;
       if (!s || !s.raw) return;
-      // waveform
+      // waveform in ink
       const sr = s.raw.sampleRate, data = s.mono();
       const spp = ((this.ve - this.vs) * sr) / W; // samples per pixel
       const useP = spp > s.peaks.bin * 2;
       g.fillStyle = color;
-      g.globalAlpha = 0.95;
+      g.globalAlpha = this.track.kind === 'granular' ? 0.42 : 1;
       for (let x = 0; x < W; x++) {
         const a = Math.floor((this.vs * sr) + x * spp), b = Math.floor((this.vs * sr) + (x + 1) * spp);
         let lo = 0, hi = 0;
@@ -342,32 +345,32 @@
         g.fillRect(x, y0, 1, Math.max(1, y1 - y0));
       }
       g.globalAlpha = 1;
-      // outside region dimming
+      // outside region: aged, shaded paper
       const xs = this.xOf(s.start), xe = this.xOf(s.end);
-      g.fillStyle = 'rgba(8,9,12,0.72)';
+      g.fillStyle = 'rgba(120,92,52,0.42)';
       if (xs > 0) g.fillRect(0, 0, xs, H);
       if (xe < W) g.fillRect(xe, 0, W - xe, H);
-      // region bar
-      g.fillStyle = color; g.globalAlpha = 0.25; g.fillRect(xs, 0, xe - xs, 16); g.globalAlpha = 1;
+      // region ribbon
+      g.fillStyle = color; g.globalAlpha = 0.18; g.fillRect(xs, 0, xe - xs, 14); g.globalAlpha = 1;
       // fades envelope
       const xfi = this.xOf(s.start + s.fadeIn), xfo = this.xOf(s.end - s.fadeOut);
-      g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1.25;
-      g.beginPath(); g.moveTo(xs, bot); g.lineTo(xfi, top); g.lineTo(xfo, top); g.lineTo(xe, bot); g.stroke();
-      g.fillStyle = 'rgba(8,9,12,0.45)';
+      g.fillStyle = 'rgba(120,92,52,0.25)';
       g.beginPath(); g.moveTo(xs, top); g.lineTo(xfi, top); g.lineTo(xs, bot); g.closePath(); g.fill();
       g.beginPath(); g.moveTo(xe, top); g.lineTo(xfo, top); g.lineTo(xe, bot); g.closePath(); g.fill();
-      // handles
-      g.fillStyle = '#fff';
+      g.strokeStyle = T.ink; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(xs, bot); g.lineTo(xfi, top); g.lineTo(xfo, top); g.lineTo(xe, bot); g.stroke();
+      // trim handles: ink rules with bookmark flags
+      g.fillStyle = T.ink;
       g.fillRect(Math.round(xs) - 1, 0, 2, H); g.fillRect(Math.round(xe) - 1, 0, 2, H);
-      g.fillStyle = color;
-      g.beginPath(); g.moveTo(xs, 0); g.lineTo(xs + 9, 0); g.lineTo(xs, 12); g.closePath(); g.fill();
-      g.beginPath(); g.moveTo(xe, 0); g.lineTo(xe - 9, 0); g.lineTo(xe, 12); g.closePath(); g.fill();
-      g.fillStyle = '#fff';
-      [xfi, xfo].forEach((x) => { g.fillRect(x - 4, top - 4, 8, 8); });
-      g.fillStyle = '#0c0d10';
-      [xfi, xfo].forEach((x) => { g.fillRect(x - 2, top - 2, 4, 4); });
-      if (s.reverse) { g.fillStyle = color; g.font = '700 10px -apple-system, sans-serif'; g.fillText('◀ REVERSED', Math.max(4, xs + 12), 12); }
-      // granular position overlay
+      const flag = (x, dir) => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + dir * 11, 0); g.lineTo(x + dir * 11, 13); g.lineTo(x + dir * 5.5, 9); g.lineTo(x, 13); g.closePath(); g.fill(); };
+      g.fillStyle = T.marker; flag(xs, 1); flag(xe, -1);
+      // fade handles: wax-seal dots
+      [xfi, xfo].forEach((x) => {
+        g.fillStyle = T.oxblood; g.beginPath(); g.arc(x, top, 5, 0, Math.PI * 2); g.fill();
+        g.fillStyle = T.gold; g.beginPath(); g.arc(x, top, 2, 0, Math.PI * 2); g.fill();
+      });
+      if (s.reverse) { g.fillStyle = T.marker; g.font = `italic 600 12px ${T.serif}`; g.fillText('← reversed', Math.max(4, xs + 15), 12); }
+      // granular overlay: position, spray window and the live grain cloud
       if (this.track.kind === 'granular') {
         const now = eng.ctx.currentTime;
         const pos = eng.val('gran.pos', now), spray = eng.val('gran.spray', now);
@@ -375,18 +378,26 @@
         const toRaw = (f) => (s.reverse ? s.end - f * len : s.start + f * len);
         const xp = this.xOf(toRaw(pos));
         const sw = (spray * 0.5 * len / (this.ve - this.vs)) * W;
-        g.fillStyle = 'rgba(255,255,255,0.10)';
+        g.fillStyle = 'rgba(201,164,86,0.22)';
         g.fillRect(xp - sw, top, sw * 2, bot - top);
-        g.fillStyle = '#fff'; g.fillRect(xp - 0.5, top, 1.5, bot - top);
-        // live grain heads for sounding voices
-        g.fillStyle = color;
-        const scan = eng.val('gran.scan', now);
-        eng.voices.forEach((v) => {
-          if (now < v.tOn) return;
-          const f = U.wrap(pos + (scan * (now - v.tOn)) / Math.max(0.001, len), 1);
-          const x = this.xOf(toRaw(f));
-          g.beginPath(); g.arc(x, top + 4, 3, 0, Math.PI * 2); g.fill();
-        });
+        g.fillStyle = T.goldDeep; g.fillRect(xp - 0.75, top - 6, 1.5, bot - top + 6);
+        g.beginPath(); g.moveTo(xp - 5, top - 8); g.lineTo(xp + 5, top - 8); g.lineTo(xp, top - 2); g.closePath(); g.fill();
+        const log = eng.grainLog || [];
+        for (let i = log.length - 1; i >= 0; i--) {
+          const gr = log[i];
+          if (gr.end < now - 0.25) break;
+          if (gr.t > now) continue;
+          const life = gr.end >= now ? 1 : 1 - (now - gr.end) / 0.25;
+          const x0 = this.xOf(toRaw(gr.off)), x1 = this.xOf(toRaw(Math.min(1, gr.off + gr.len)));
+          const y = U.clamp(mid - gr.semis * (amp / 26) - gr.pan * 6, top + 4, bot - 4);
+          const w = Math.max(3, Math.abs(x1 - x0));
+          g.globalAlpha = Math.min(0.95, 0.35 + gr.amp * 1.6) * life;
+          g.fillStyle = gr.rev ? T.marker : T.ink;
+          g.beginPath(); g.ellipse(Math.min(x0, x1) + w / 2, y, w / 2, 3.4, 0, 0, Math.PI * 2); g.fill();
+          g.globalAlpha *= 0.9; g.fillStyle = T.gold;
+          g.beginPath(); g.arc(Math.min(x0, x1) + 2, y, 1.6, 0, Math.PI * 2); g.fill();
+        }
+        g.globalAlpha = 1;
       }
       // preview playhead
       const pv = eng.previewing;
@@ -394,29 +405,28 @@
         const el = eng.ctx.currentTime - pv.t + pv.offset;
         if (el >= 0 && el <= s.buffer.duration) {
           const t = s.reverse ? s.end - el : s.start + el;
-          const x = this.xOf(t);
-          g.fillStyle = '#fff'; g.fillRect(x, 0, 1.5, H);
+          g.fillStyle = T.marker; g.fillRect(this.xOf(t), 0, 1.5, H);
         }
       }
-      // ruler
-      g.fillStyle = 'rgba(255,255,255,0.4)'; g.font = '9px "SF Mono", Menlo, monospace';
+      // ruler in typewriter numerals
+      g.fillStyle = T.inkSoft; g.font = `10px ${T.type}`;
       const span = this.ve - this.vs;
       const stepT = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10].find((v) => (v / span) * W > 70) || 10;
       for (let t = Math.ceil(this.vs / stepT) * stepT; t < this.ve; t += stepT) {
         const x = this.xOf(t);
-        g.fillRect(x, H - 4, 1, 4);
+        g.fillRect(x, H - 5, 1, 5);
         g.fillText(t < 1 ? Math.round(t * 1000) + 'ms' : t.toFixed(stepT < 1 ? 1 : 0) + 's', x + 3, H - 3);
       }
     }
 
     drawLive(g, W, top, bot, mid, amp, color) {
-      const mic = BBB.mic;
+      const mic = BBB.mic, T = BBB.THEME;
       const chunks = mic.state === 'armed' ? mic.preroll : mic.chunks;
       const sr = BBB.engine.ctx.sampleRate;
       const total = chunks.reduce((a, c) => a + c.length, 0);
       const span = Math.max(3 * sr, total);
       const spp = span / W;
-      g.fillStyle = mic.state === 'recording' ? '#ff3b3b' : 'rgba(255,255,255,0.4)';
+      g.fillStyle = mic.state === 'recording' ? T.marker : T.inkSoft;
       let x = 0, acc = 0, lo = 0, hi = 0;
       chunks.forEach((c) => {
         for (let i = 0; i < c.length; i++) {
@@ -427,11 +437,11 @@
           }
         }
       });
-      g.fillStyle = '#fff'; g.font = '700 11px -apple-system, sans-serif';
-      g.fillText(mic.state === 'armed' ? 'ARMED — make a sound to start recording' : '● RECORDING into ' + this.track.name + ' — press REC/STOP when done', 8, 13);
+      g.fillStyle = mic.state === 'recording' ? T.marker : T.ink; g.font = `italic 600 13px ${T.serif}`;
+      g.fillText(mic.state === 'armed' ? 'Listening… make a sound to begin recording' : '● Recording into ' + this.track.title + ' — press Stop when done', 8, 14);
       if (mic.threshold) {
         const ty = U.dbToGain(mic.thresholdDb) * amp;
-        g.strokeStyle = 'rgba(255,200,60,0.5)'; g.setLineDash([4, 4]);
+        g.strokeStyle = 'rgba(168,50,42,0.45)'; g.setLineDash([4, 4]);
         g.beginPath(); g.moveTo(0, mid - ty); g.lineTo(W, mid - ty); g.moveTo(0, mid + ty); g.lineTo(W, mid + ty); g.stroke();
         g.setLineDash([]);
       }

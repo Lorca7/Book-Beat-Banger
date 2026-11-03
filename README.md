@@ -1,6 +1,8 @@
 # Book Beat Banger
 
-A standalone 4‑track sampling drum machine for macOS (built and tested for **macOS Sonoma 14.6**, runs on Apple Silicon and Intel).
+A boutique, book‑themed 4‑track sampling drum machine for macOS (built for **macOS Sonoma 14.6**, runs on Apple Silicon and Intel).
+
+The interface is styled like a private library. The header is an oxblood book spine. The sequencer is a parchment ledger, and each track is a numbered chapter. The sample editor, effects and modulation sections are gold‑tooled leather volumes. Typography is set in EB Garamond, IM Fell English and Courier Prime; the fonts are bundled, so the app works offline.
 
 ![tracks](build/icon.png)
 
@@ -10,8 +12,9 @@ A standalone 4‑track sampling drum machine for macOS (built and tested for **m
 
 | | |
 |---|---|
-| **4 tracks** | Kick, Snare, Hi‑Hat (sample players with Level / Pan / Tune / Decay / Start) and a **Granular Synth** (Position, Scan, Grain size, Density, Spray, Stereo spread, Detune, Pitch, Attack, Release). |
+| **4 tracks** | Kick, Snare and Hi‑Hat are sample players with Level, Pan, Tune, Decay and Start. The fourth track is a full **granular synthesizer** (see below). |
 | **16‑step sequencer** | Click or drag to paint steps. Option‑drag ↕ on a step sets its velocity. ‹ › shift the pattern and ✕ clears it. Swing is global. |
+| **Granular synthesis** | **Cloud:** Position, Scan (playback speed through the sample, ±2×), Spray (position randomness), Density (1–120 grains/s), Jitter (timing randomness, from regular to cloud‑like), Freeze. **Grain:** Size (5 ms–1 s), Size ± randomness, seven window shapes (Hann, Gauss, Triangle, Plateau, Pluck, Swell, Gate), Skew, Reverse probability. **Pitch:** Pitch, Fine, Scatter (random pitch up to ±24 semitones), quantized to Free, Semitone, Fifths, Octaves, Pentatonic or Minor. **Envelope:** a full ADSR per voice. **Filter:** a per‑voice low‑pass with Cutoff, Resonance and an envelope amount of ±6 octaves. **Output:** Level, Pan, Stereo spread, Amp ± randomness, and a live count of sounding grains. Every control can be modulated by the LFOs and automated. The waveform view draws the live **grain cloud** (each grain as an ink mote, reversed grains in red) over the sample. |
 | **Chromatic granular sequencer** | A piano roll (16 steps × 2 octaves, scrollable). Click to add a note and drag right to lengthen it. Drag a note to move it, or drag its right edge to resize. Click a note to delete it. Polyphonic. The keys A–K play it live. |
 | **Record your own samples** | Press ● on any track. With **AUTO‑START** on, recording begins when you make a sound (adjustable threshold, with pre‑roll so the attack isn't cut off). Press again to stop: the sample is auto‑trimmed, normalized, assigned to the track and auditioned. |
 | **Waveform editor** | Live waveform while recording. Afterwards: drag the start/end triangles to trim, drag the white squares to set fade‑in/out, drag across the waveform to pick a new region, scroll to zoom, click to audition. Normalize, Reverse, Gain, Auto‑Trim, Load file, Factory reset and Save WAV are all there. Every edit is non‑destructive and audible immediately. You can also drop an audio file onto a track or the waveform. |
@@ -65,11 +68,16 @@ app/js/sounds.js     factory sounds synthesized at start-up
 app/js/sample.js     sample slots (non-destructive edits, auto-trim), audio capture, mic recorder
 app/js/engine.js     Web Audio engine: look-ahead scheduler, drum voices, granular grains,
                      per-track FX chain with dry/wet, sample-accurate modulation, offline render
-app/js/ui-*.js       knob, step sequencer / piano roll, sample editor, LFO panel
+app/js/ui-*.js       knob, step sequencer / piano roll, granular panel, sample editor, LFO panel
+app/fonts/           bundled OFL fonts
 scripts/smoke-test.js  headless end-to-end test (Playwright)
 ```
 
 The same engine runs for live playback and for offline WAV export, so an export sounds the same as what you hear when playing back.
+
+## Fonts
+
+EB Garamond, IM Fell English and Courier Prime are bundled in `app/fonts` under the SIL Open Font License 1.1 (licence texts are alongside).
 
 ## Tests
 
@@ -77,4 +85,4 @@ The same engine runs for live playback and for offline WAV export, so an export 
 npm install --no-save playwright && npx playwright install chromium
 npm test
 ```
-The smoke test drives the real UI in Chromium. It covers playback, LFO drag and drop, automation recording, piano roll, step painting, recording from a fake microphone, sample editing, offline export, live REC and a project save/load round‑trip.
+The smoke test drives the real UI in Chromium. It covers playback, LFO drag and drop, automation recording, piano roll, step painting, recording from a fake microphone, sample editing, every grain window, reversed and randomized grains, pitch quantization, the voice filter and envelope, offline export, live REC and a project save/load round‑trip.

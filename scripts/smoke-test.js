@@ -140,6 +140,46 @@ const { chromium } = require('playwright');
   });
   ok(granOnly > 0.005, `granular track renders audio when soloed (rms=${granOnly.toFixed(3)})`);
 
+  // ---- granular sound-design controls ----
+  const gtest = await page.evaluate(async () => {
+    const T = BBB.state.tracks, P = (id, v) => BBB.param(id).value = v;
+    const solo = async (bars) => {
+      T.forEach((t, i) => (t.solo = i === 3));
+      const buf = await BBB.renderOffline({ bars: bars || 1, tail: false, sampleRate: 44100 });
+      T.forEach((t) => (t.solo = false));
+      const d = buf.getChannelData(0); let s = 0, nan = 0;
+      for (let i = 0; i < d.length; i++) { if (d[i] !== d[i]) nan++; s += d[i] * d[i]; }
+      return { rms: Math.sqrt(s / d.length), nan };
+    };
+    const out = {};
+    for (const [w] of BBB.GRAIN_WINDOWS) { BBB.state.gran.window = w; out['win_' + w] = (await solo()).rms; }
+    BBB.state.gran.window = 'hann';
+    P('gran.reverse', 1); P('gran.sizernd', 0.8); P('gran.amprnd', 0.5); P('gran.jitter', 1); P('gran.skew', 0.7);
+    out.reverse = (await solo()).rms;
+    BBB.state.gran.quant = 'penta'; P('gran.detune', 12); out.quant = (await solo()).rms;
+    out.qtest = [BBB.quantizePitch(5.4, 'oct'), BBB.quantizePitch(5.4, 'penta'), BBB.quantizePitch(-6.6, 'minor'), BBB.quantizePitch(3.2, 'fifth')];
+    P('gran.cutoff', 200); P('gran.fenv', 0); const dark = await solo();
+    P('gran.fenv', 1); const bright = await solo();
+    out.filter = [dark.rms, bright.rms];
+    BBB.state.gran.freeze = true; P('gran.sustain', 0); P('gran.decay', 0.05); out.adsr = (await solo()).rms;
+    out.nan = dark.nan + bright.nan;
+    // restore defaults
+    ['gran.reverse', 'gran.sizernd', 'gran.amprnd', 'gran.jitter', 'gran.skew', 'gran.detune', 'gran.cutoff', 'gran.fenv', 'gran.sustain', 'gran.decay'].forEach((id) => BBB.param(id).reset());
+    BBB.state.gran.quant = 'semi';
+    out.saved = JSON.stringify(BBB.serialize().gran);
+    return out;
+  });
+  const wins = Object.keys(gtest).filter((k) => k.startsWith('win_'));
+  ok(wins.every((k) => gtest[k] > 0.003), 'all ' + wins.length + ' grain windows render (' + wins.map((k) => k.slice(4) + '=' + gtest[k].toFixed(3)).join(' ') + ')');
+  ok(gtest.reverse > 0.003, `reversed / size± / amp± / jitter / skew grains render (rms=${gtest.reverse.toFixed(3)})`);
+  ok(gtest.quant > 0.003 && JSON.stringify(gtest.qtest) === '[0,4,-7,0]', `pitch scatter quantizes to scale ${JSON.stringify(gtest.qtest)}`);
+  ok(gtest.filter[1] > gtest.filter[0] * 1.3 && gtest.nan === 0, `voice filter + envelope amount opens the filter (rms ${gtest.filter[0].toFixed(3)} → ${gtest.filter[1].toFixed(3)})`);
+  ok(gtest.adsr < gtest.reverse, `ADSR with zero sustain decays the voice (rms=${gtest.adsr.toFixed(4)})`);
+  ok(gtest.saved.includes('"quant":"semi"') && gtest.saved.includes('"freeze":true'), 'granular mode settings are saved with the project ' + gtest.saved);
+  await page.click('.win-view');
+  ok(await page.evaluate(() => BBB.state.gran.window === 'gauss'), 'clicking the window preview cycles the grain window');
+  await page.evaluate(() => { BBB.state.gran.freeze = false; BBB.state.gran.window = 'hann'; BBB.state.gran.quant = 'off'; });
+
   // ---- export dialog through the UI ----
   await page.click('.btn.accent:has-text("EXPORT WAV")');
   const dl = page.waitForEvent('download', { timeout: 20000 });

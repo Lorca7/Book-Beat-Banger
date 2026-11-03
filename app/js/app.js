@@ -15,7 +15,9 @@
   window.addEventListener('keydown', unlock, true);
 
   S.tracks.forEach((t) => { t.sample = new BBB.SampleSlot(t.id); });
-  const factory = await BBB.makeFactorySounds();
+  const fontsReady = document.fonts ? Promise.all(['500 12px "EB Garamond"', '600 12px "EB Garamond"', '12px "IM Fell English"', 'italic 12px "IM Fell English"', '12px "IM Fell English SC"', '12px "Courier Prime"']
+    .map((f) => document.fonts.load(f))).catch(() => null) : Promise.resolve();
+  const [factory] = await Promise.all([BBB.makeFactorySounds(), fontsReady]);
   S.tracks.forEach((t) => {
     t.sample.factory = factory[t.id];
     t.sample.setRaw(factory[t.id], { name: 'Factory ' + t.name.toLowerCase(), custom: false });
@@ -32,6 +34,7 @@
   const rows = [];
   const thumbs = [];
   const trackEls = [];
+  let granPanel = null;
 
   // ---- top bar ----
   const playBtn = BBB.el('button', { class: 'tbtn play', title: 'Play / Stop (Space)', html: '<svg viewBox="0 0 20 20"><path d="M5 3 L17 10 L5 17 Z"/></svg>' });
@@ -40,13 +43,13 @@
   const recTime = BBB.el('span', { class: 'mono rec-clock' });
   const autoBtn = BBB.el('button', { class: 'tbtn auto', title: 'Automation write: while playing, knob moves are recorded into automation lanes, and pads/keys are recorded into the pattern (quantized).', html: '<span class="auto-dot"></span><span>AUTO</span>' });
   const autoBars = BBB.el('select', { class: 'mini-sel', title: 'Automation loop length' }, [1, 2, 4, 8].map((b) => BBB.el('option', { value: b, text: b + (b === 1 ? ' bar' : ' bars') })));
-  const autoClear = BBB.el('button', { class: 'btn tiny', text: 'CLR', title: 'Clear all automation' });
+  const autoClear = BBB.el('button', { class: 'btn tiny', text: 'CLEAR', title: 'Clear all automation' });
   const bpmIn = BBB.el('input', { class: 'bpm-in mono', type: 'number', min: 40, max: 240, step: 1, value: S.bpm });
   const bpmBox = BBB.el('div', { class: 'bpm', title: 'Tempo — drag ↕ on the label or type' }, [BBB.el('span', { class: 'bpm-lbl', text: 'BPM' }), bpmIn]);
   const posEl = BBB.el('div', { class: 'pos mono', text: '1.1.1' });
   const swingK = new BBB.Knob(BBB.param('master.swing'), { size: 34, small: true });
   const volK = new BBB.Knob(BBB.param('master.vol'), { size: 34, small: true });
-  const meter = BBB.el('canvas', { class: 'meter', width: 120, height: 28 });
+  const meter = BBB.el('canvas', { class: 'meter', width: 240, height: 56 });
   const fileBtns = BBB.el('div', { class: 'file-btns' }, [
     BBB.el('button', { class: 'btn', text: 'NEW', title: 'New project (⌘N)', onclick: () => newProject() }),
     BBB.el('button', { class: 'btn', text: 'OPEN', title: 'Open project (⌘O)', onclick: () => openProject() }),
@@ -54,8 +57,11 @@
     BBB.el('button', { class: 'btn accent', text: 'EXPORT WAV', title: 'Render the song to a WAV file (⌘E)', onclick: () => showExport() }),
     BBB.el('button', { class: 'btn', text: '?', title: 'Shortcuts & tips', onclick: () => showHelp() })
   ]);
-  app.appendChild(BBB.el('header', { class: 'topbar' }, [
-    BBB.el('div', { class: 'brand' }, [BBB.el('div', { class: 'logo', html: 'BOOK<b>·</b>BEAT<b>·</b>BANGER' }), BBB.el('div', { class: 'sub', text: '4-TRACK SAMPLING DRUM MACHINE' })]),
+  app.appendChild(BBB.el('header', { class: 'topbar leather spine' }, [
+    BBB.el('div', { class: 'brand' }, [
+      BBB.el('div', { class: 'logo', html: 'Book <i>Beat</i> Banger' }),
+      BBB.el('div', { class: 'sub', html: 'A Sampling Drum Machine <span>❦</span> Vol. I' })
+    ]),
     BBB.el('div', { class: 'transport' }, [playBtn, stopBtn, recBtn, recTime]),
     BBB.el('div', { class: 'autobox' }, [autoBtn, autoBars, autoClear]),
     bpmBox, posEl,
@@ -66,12 +72,14 @@
   ]));
 
   // ---- sequencer ----
-  const seq = BBB.el('section', { class: 'seq' });
+  const seq = BBB.el('section', { class: 'seq paper' });
   app.appendChild(seq);
   S.tracks.forEach((t, i) => {
     const row = BBB.el('div', { class: 'track ' + t.kind, style: { '--c': t.color } });
     const led = BBB.el('span', { class: 'led' });
-    const pad = BBB.el('button', { class: 'pad', title: t.kind === 'drum' ? `Play ${t.name} (key ${i + 1})` : 'Play the granular synth (keys A–K)' }, [led, BBB.el('span', { text: t.name })]);
+    const pad = BBB.el('button', { class: 'pad', title: t.kind === 'drum' ? `Play ${t.title} (key ${i + 1})` : 'Play the granular synth (keys A–K)' }, [
+      led, BBB.el('span', { class: 'numeral', text: t.numeral + '.' }), BBB.el('span', { class: 'tname', text: t.title })
+    ]);
     pad.addEventListener('pointerdown', (e) => { if (e.button === 0) { BBB.ensureAudio(); liveHit(i, 0.9); } });
     const mBtn = BBB.el('button', { class: 'mini', text: 'M', title: 'Mute' });
     const sBtn = BBB.el('button', { class: 'mini', text: 'S', title: 'Solo' });
@@ -98,12 +106,13 @@
       BBB.el('button', { class: 'mini', text: '✕', title: 'Clear pattern', onclick: () => clearTrack(i) })
     ]);
     row.appendChild(tools);
-    const kn = BBB.el('div', { class: 'tknobs' });
-    const ids = t.kind === 'drum'
-      ? ['level', 'pan', 'tune', 'decay', 'start']
-      : ['level', 'pan', 'pitch', 'pos', 'scan', 'size', 'dens', 'spray', 'spread', 'detune', 'attack', 'release'];
-    ids.forEach((k) => kn.appendChild(new BBB.Knob(BBB.param(t.id + '.' + k), { size: t.kind === 'drum' ? 34 : 38 }).el));
-    row.appendChild(kn);
+    if (t.kind === 'drum') {
+      const kn = BBB.el('div', { class: 'tknobs' });
+      ['level', 'pan', 'tune', 'decay', 'start'].forEach((k) => kn.appendChild(new BBB.Knob(BBB.param(t.id + '.' + k), { size: 32 }).el));
+      row.appendChild(kn);
+    } else {
+      granPanel = new BBB.GranPanel(row);
+    }
     row.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); row.classList.add('over'); } });
     row.addEventListener('dragleave', () => row.classList.remove('over'));
     row.addEventListener('drop', (e) => { e.preventDefault(); row.classList.remove('over'); if (e.dataTransfer.files[0]) BBB.loadFileIntoTrack(i, e.dataTransfer.files[0]); });
@@ -115,16 +124,16 @@
   const bottom = BBB.el('section', { class: 'bottom' });
   app.appendChild(bottom);
   const editor = (BBB.editor = new BBB.SampleEditor(bottom));
-  const fx = BBB.el('div', { class: 'panel fx' });
-  fx.appendChild(BBB.el('div', { class: 'panel-head' }, [BBB.el('div', { class: 'panel-title', text: 'EFFECTS' }), BBB.el('div', { class: 'hint', text: 'dry/wet per track' })]));
+  const fx = BBB.el('div', { class: 'panel fx leather binding-navy' });
+  fx.appendChild(BBB.el('div', { class: 'panel-head' }, [BBB.el('div', { class: 'panel-title', html: '<span class="orn">❧</span> Effects' }), BBB.el('div', { class: 'hint', text: 'dry / wet per track' })]));
   const fxGrid = BBB.el('div', { class: 'fx-grid' });
   fxGrid.appendChild(BBB.el('div', { class: 'fx-colhead' }, [
-    BBB.el('span', { text: '' }), BBB.el('span', { text: 'SETTINGS' }),
+    BBB.el('span', { text: '' }), BBB.el('span', { text: 'Settings' }),
     BBB.el('span', { class: 'mixhead' }, S.tracks.map((t) => BBB.el('span', { text: t.short, style: { color: t.color }, title: t.name + ' dry/wet' })))
   ]));
   BBB.FX.forEach((f) => {
     const m = BBB.el('div', { class: 'fxm' });
-    const head = BBB.el('div', { class: 'fxm-head' }, [BBB.el('span', { class: 'fxm-name', text: f.name })]);
+    const head = BBB.el('div', { class: 'fxm-head' }, [BBB.el('span', { class: 'fxm-name', text: f.name.charAt(0) + f.name.slice(1).toLowerCase() })]);
     if (f.id === 'filter') {
       const types = [['lowpass', 'LP'], ['bandpass', 'BP'], ['highpass', 'HP']];
       const tb = BBB.el('div', { class: 'ftypes' });
@@ -339,17 +348,21 @@
     const cv = thumbs[i], g = cv.getContext('2d'), s = S.tracks[i].sample;
     g.clearRect(0, 0, cv.width, cv.height);
     if (!s.buffer) return;
-    const d = s.buffer.getChannelData(0), W = cv.width, H = cv.height, mid = H / 2;
+    const d = s.buffer.getChannelData(0), W = cv.width, H = cv.height, mid = H / 2, T = BBB.THEME;
     const spp = d.length / W;
+    g.fillStyle = T.rule; g.fillRect(0, mid, W, 1);
     g.fillStyle = S.tracks[i].color;
     for (let x = 0; x < W; x++) {
       let pk = 0;
       const a = Math.floor(x * spp), b = Math.floor((x + 1) * spp);
       for (let k = a; k < b; k += Math.max(1, Math.floor((b - a) / 32))) { const v = Math.abs(d[k]); if (v > pk) pk = v; }
-      const h = Math.max(1, pk * (H / 2 - 2));
+      const h = Math.max(1, pk * (H / 2 - 4));
       g.fillRect(x, mid - h, 1, h * 2);
     }
-    if (s.custom) { g.fillStyle = '#fff'; g.font = '600 16px -apple-system, sans-serif'; g.fillText('●', W - 18, 18); }
+    if (s.custom) {
+      g.font = `italic 600 22px ${T.serif}`; g.textAlign = 'right';
+      g.fillStyle = T.marker; g.fillText('your recording', W - 8, 24); g.textAlign = 'left';
+    }
   }
   BBB.on('sample', (slot) => { const i = S.tracks.findIndex((t) => t.sample === slot); if (i >= 0) drawThumb(i); });
   S.tracks.forEach((t, i) => drawThumb(i));
@@ -367,7 +380,7 @@
     return {
       app: 'book-beat-banger', version: 1, bpm: S.bpm, params,
       tracks: S.tracks.map((t) => ({ id: t.id, steps: t.steps, notes: t.notes, mute: t.mute, solo: t.solo, sample: t.sample.toJSON() })),
-      lfos: S.lfos, mods: S.mods, auto: { bars: S.auto.bars, lanes }, fx: S.fx
+      lfos: S.lfos, mods: S.mods, auto: { bars: S.auto.bars, lanes }, fx: S.fx, gran: S.gran
     };
   }
   async function deserialize(j) {
@@ -383,6 +396,8 @@
     S.auto.lanes = {};
     if (j.auto && j.auto.lanes) for (const id in j.auto.lanes) if (BBB.param(id)) S.auto.lanes[id] = Float32Array.from(j.auto.lanes[id]);
     S.fx = Object.assign({ filterType: 'lowpass' }, j.fx || {});
+    S.gran = Object.assign({ window: 'hann', quant: 'off', freeze: false }, j.gran || {});
+    if (granPanel) granPanel.sync();
     engine.setFilterType(S.fx.filterType);
     fx._ftypes.querySelectorAll('.shape').forEach((x) => x.classList.toggle('on', x.dataset.type === S.fx.filterType));
     for (const jt of j.tracks || []) {
@@ -437,6 +452,7 @@
     blank.mods = []; blank.auto = { bars: 1, lanes: {} }; blank.bpm = 120;
     blank.lfos = [0, 1, 2, 3].map((i) => ({ shape: ['sine', 'tri', 'sh', 'drift'][i], sync: true }));
     blank.fx = { filterType: 'lowpass' };
+    blank.gran = { window: 'hann', quant: 'off', freeze: false };
     await deserialize(blank);
   }
   BBB.serialize = serialize; BBB.deserialize = deserialize;
@@ -491,6 +507,7 @@
       'Drag the triangles to trim, drag the white squares to set fades, drag across the waveform to select a new region, scroll to zoom.',
       'Drag across steps to paint. Option-drag up/down on a step sets its velocity.',
       'Piano roll: click to add a note and drag right to lengthen it. Drag a note to move it, or its right edge to resize. Click a note to delete it.',
+      'Granular: click the grain-window picture to cycle window shapes. SCATTER plus SCALE gives shimmering, in-key pitch clouds. FREEZE holds the read position. The Sample page shows every grain as it sounds.',
       'Drag an LFO’s ◉ onto any knob to modulate it. Drag the target chip ↔ in the LFO strip to set its depth. Right-click a knob for more options.',
       'AUTO + play: knob moves are written as automation (loop length is selectable), and pads/keys are written into the pattern.',
       'REC records the master output live to a WAV file. EXPORT WAV renders a set number of bars offline.'
@@ -585,15 +602,20 @@
     if (pk > 0.98) clipHold = 40;
     const mg = meter.getContext('2d'), MW = meter.width, MH = meter.height;
     mg.clearRect(0, 0, MW, MH);
-    mg.fillStyle = '#0b0c0f'; mg.fillRect(0, 0, MW, MH);
+    const T = BBB.THEME;
+    mg.fillStyle = T.paper; mg.fillRect(0, 0, MW, MH);
+    // ledger ticks every 6 dB
+    mg.fillStyle = T.rule;
+    for (let db = -48; db <= 0; db += 6) mg.fillRect(4 + ((db + 48) / 48) * (MW - 30), MH - 12, 2, 8);
     const f = U.clamp((U.gainToDb(meterPeak) + 48) / 48, 0, 1);
     const grd = mg.createLinearGradient(0, 0, MW, 0);
-    grd.addColorStop(0, '#3ee0c5'); grd.addColorStop(0.75, '#ffc233'); grd.addColorStop(1, '#ff5a36');
-    mg.fillStyle = grd; mg.fillRect(2, 6, (MW - 14) * f, MH - 12);
-    mg.fillStyle = clipHold-- > 0 ? '#ff3b3b' : '#2a2c33'; mg.fillRect(MW - 9, 6, 7, MH - 12);
+    grd.addColorStop(0, '#2f7d68'); grd.addColorStop(0.72, '#b5862a'); grd.addColorStop(1, '#a8322a');
+    mg.fillStyle = grd; mg.fillRect(4, 12, (MW - 30) * f, MH - 28);
+    mg.fillStyle = clipHold-- > 0 ? T.marker : T.paperShade; mg.beginPath(); mg.arc(MW - 12, MH / 2, 7, 0, Math.PI * 2); mg.fill();
     recTime.textContent = masterRec.active ? U.fmtClock(masterRec.frames / ctx.sampleRate) : '';
     editor.frame(engine);
     lfoPanel.frame(engine);
+    if (granPanel) granPanel.frame(engine);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);

@@ -12,11 +12,45 @@
     for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(x * 3) / Math.tanh(3); }
     return c;
   })();
-  const HANN = (() => {
-    const n = 48, c = new Float32Array(n);
-    for (let i = 0; i < n; i++) c[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
+
+  // ---------- grain windows ----------
+  const WIN_N = 64;
+  const winCache = new Map();
+  BBB.grainWindow = (shape, skew) => {
+    skew = Math.round(U.clamp(skew || 0, -1, 1) * 40) / 40;
+    const key = shape + ':' + skew;
+    let c = winCache.get(key);
+    if (c) return c;
+    c = new Float32Array(WIN_N);
+    const p = Math.pow(2, skew * 1.6); // warp: skew > 0 pushes the peak later
+    for (let i = 0; i < WIN_N; i++) {
+      const x = i / (WIN_N - 1), t = Math.pow(x, p);
+      let y;
+      switch (shape) {
+        case 'gauss': y = Math.exp(-0.5 * Math.pow((t - 0.5) / 0.16, 2)); break;
+        case 'tri': y = 1 - Math.abs(2 * t - 1); break;
+        case 'tukey': y = t < 0.2 ? 0.5 - 0.5 * Math.cos((Math.PI * t) / 0.2) : t > 0.8 ? 0.5 - 0.5 * Math.cos((Math.PI * (1 - t)) / 0.2) : 1; break;
+        case 'perc': y = (t < 0.03 ? t / 0.03 : Math.exp(-(t - 0.03) * 6)); break;
+        case 'swell': y = (t > 0.97 ? (1 - t) / 0.03 : Math.exp(-(0.97 - t) * 6)); break;
+        case 'rect': y = t < 0.02 ? t / 0.02 : t > 0.98 ? (1 - t) / 0.02 : 1; break;
+        default: y = 0.5 - 0.5 * Math.cos(2 * Math.PI * t);
+      }
+      c[i] = y;
+    }
+    c[0] = 0; c[WIN_N - 1] = 0;
+    winCache.set(key, c);
     return c;
-  })();
+  };
+  const SCALES = { penta: [0, 2, 4, 7, 9], minor: [0, 2, 3, 5, 7, 8, 10], fifth: [0, 7] };
+  BBB.quantizePitch = (semis, mode) => {
+    if (!mode || mode === 'off') return semis;
+    if (mode === 'semi') return Math.round(semis);
+    if (mode === 'oct') return Math.round(semis / 12) * 12;
+    const sc = SCALES[mode];
+    let best = 0, bd = Infinity;
+    for (let o = -3; o <= 3; o++) for (const d of sc) { const c = o * 12 + d, dd = Math.abs(c - semis); if (dd < bd) { bd = dd; best = c; } }
+    return best;
+  };
 
   const makeIR = (ctx, seconds) => {
     const sr = ctx.sampleRate, len = Math.max(1, Math.floor(seconds * sr));
@@ -350,13 +384,22 @@
 
     // ---------- granular ----------
     noteVoice(note, tOn, tOff, vel, seq) {
-      const v = { note, tOn, tOff, vel, seq, next: tOn, id: Math.random() };
+      const v = { note, tOn, tOff, vel, seq, next: tOn, id: Math.random(), lastEnd: tOn };
       this.voices.push(v);
       if (this.live) BBB.emit('hit', 3, tOn);
       return v;
     }
     noteOn(note) { return this.noteVoice(note, this.ctx.currentTime + 0.01, Infinity, 0.9, false); }
     noteOff(v) { if (v) v.tOff = Math.max(v.tOn, this.ctx.currentTime); }
+
+    /** ADSR level of a voice at time t. */
+    voiceEnv(v, t) {
+      const a = this.val('gran.attack', t), d = this.val('gran.decay', t), su = this.val('gran.sustain', t);
+      const lvl = (el) => (el < a ? el / a : el < a + d ? 1 - (1 - su) * ((el - a) / d) : su);
+      if (t <= v.tOff) return lvl(t - v.tOn);
+      const r = this.val('gran.release', t);
+      return lvl(v.tOff - v.tOn) * Math.max(0, 1 - (t - v.tOff) / r);
+    }
 
     scheduleGrains(horizon) {
       const tr = S.tracks[3];
@@ -365,19 +408,48 @@
       for (let k = this.voices.length - 1; k >= 0; k--) {
         const v = this.voices[k];
         let guard = 0;
-        while (v.next < horizon && guard++ < 400) {
+        while (v.next < horizon && guard++ < 600) {
           const t = v.next;
           const rel = this.val('gran.release', Math.min(t, v.tOff));
           if (t > v.tOff + rel) { v.dead = true; break; }
-          if (buf) this.emitGrain(v, t, buf, rel);
-          const dens = this.val('gran.dens', t);
-          v.next = t + (1 / dens) * (0.85 + 0.3 * Math.random());
+          if (buf) this.emitGrain(v, t, buf);
+          const dens = this.val('gran.dens', t), jit = this.val('gran.jitter', t);
+          v.next = t + (1 / dens) * Math.max(0.05, 1 + (Math.random() * 2 - 1) * jit);
         }
-        if (v.dead) this.voices.splice(k, 1);
+        if (v.dead) {
+          this.voices.splice(k, 1);
+          if (v.filter && this.live) {
+            const f = v.filter, wait = Math.max(0, v.lastEnd - this.ctx.currentTime) + 0.5;
+            setTimeout(() => { try { f.disconnect(); } catch (e) { /* ignore */ } }, wait * 1000);
+          }
+        }
       }
     }
 
-    emitGrain(v, t, buf, rel) {
+    reversedBuffer(buf) {
+      if (this._revSrc === buf) return this._rev;
+      const r = new AudioBuffer({ numberOfChannels: buf.numberOfChannels, length: buf.length, sampleRate: buf.sampleRate });
+      for (let c = 0; c < buf.numberOfChannels; c++) { const d = new Float32Array(buf.getChannelData(c)); d.reverse(); r.copyToChannel(d, c); }
+      this._revSrc = buf; this._rev = r;
+      return r;
+    }
+
+    voiceFilter(v, t) {
+      if (!v.filter) {
+        v.filter = this.ctx.createBiquadFilter();
+        v.filter.type = 'lowpass';
+        v.filter.connect(this.tracks[3].input);
+      }
+      const nyq = this.ctx.sampleRate / 2 - 200;
+      const env = this.voiceEnv(v, t);
+      const cut = U.clamp(this.val('gran.cutoff', t) * Math.pow(2, this.val('gran.fenv', t) * 6 * env), 30, nyq);
+      const q = this.val('gran.res', t);
+      if (!v.fInit) { v.filter.frequency.setValueAtTime(cut, t); v.filter.Q.setValueAtTime(q, t); v.fInit = true; }
+      else { v.filter.frequency.linearRampToValueAtTime(cut, t); v.filter.Q.linearRampToValueAtTime(q, t); }
+      return v.filter;
+    }
+
+    emitGrain(v, t, buf) {
       const ctx = this.ctx;
       if (this.live) {
         // CPU guard: cap grain count per second of audio time
@@ -385,34 +457,52 @@
         if (this.grainBudget.t !== sec) { this.grainBudget.t = sec; this.grainBudget.n = 0; }
         if (++this.grainBudget.n > MAX_GRAINS_PER_SEC) return;
       }
+      const G = S.gran;
       const dur = buf.duration;
-      const pos = this.val('gran.pos', t), scan = this.val('gran.scan', t), size = this.val('gran.size', t);
+      const pos = this.val('gran.pos', t), scan = G.freeze ? 0 : this.val('gran.scan', t);
+      let size = this.val('gran.size', t);
+      const sizeRnd = this.val('gran.sizernd', t);
+      if (sizeRnd > 0) size = U.clamp(size * Math.pow(2, (Math.random() * 2 - 1) * sizeRnd * 2), 0.003, 2);
       const dens = this.val('gran.dens', t), spray = this.val('gran.spray', t), spread = this.val('gran.spread', t);
-      const pitch = this.val('gran.pitch', t), det = this.val('gran.detune', t), att = this.val('gran.attack', t);
-      const elapsed = t - v.tOn;
-      let env = att > 0 ? Math.min(1, elapsed / att) : 1;
-      if (t > v.tOff) env *= Math.max(0, 1 - (t - v.tOff) / rel);
-      const amp = v.vel * env * (0.7 / Math.sqrt(Math.max(1, dens * size)));
+      const pitch = this.val('gran.pitch', t) + this.val('gran.fine', t) / 100;
+      const scatter = BBB.quantizePitch((Math.random() * 2 - 1) * this.val('gran.detune', t), G.quant);
+      const env = this.voiceEnv(v, t);
+      let amp = v.vel * env * (0.7 / Math.sqrt(Math.max(1, dens * size)));
+      const ampRnd = this.val('gran.amprnd', t);
+      if (ampRnd > 0) amp *= 1 - ampRnd * Math.random();
+      const filter = this.voiceFilter(v, t);
       if (amp < 0.0004) return;
-      const rate = Math.pow(2, (v.note - 60 + pitch + (Math.random() * 2 - 1) * det) / 12);
+      const rate = Math.pow(2, (v.note - 60 + pitch + scatter) / 12);
+      const elapsed = t - v.tOn;
       let off = U.wrap(pos * dur + scan * elapsed + spray * (Math.random() * 2 - 1) * dur * 0.5, dur);
       const need = size * rate;
       if (off + need > dur) off = Math.max(0, dur - need);
+      const rev = Math.random() < this.val('gran.reverse', t);
       const src = ctx.createBufferSource();
-      src.buffer = buf; src.playbackRate.value = rate;
+      src.buffer = rev ? this.reversedBuffer(buf) : buf;
+      src.playbackRate.value = rate;
       const g = ctx.createGain();
       g.gain.value = 0;
-      const curve = new Float32Array(HANN.length);
-      for (let i = 0; i < curve.length; i++) curve[i] = HANN[i] * amp;
+      const win = BBB.grainWindow(G.window, this.val('gran.skew', t));
+      const curve = new Float32Array(win.length);
+      for (let i = 0; i < curve.length; i++) curve[i] = win[i] * amp;
       g.gain.setValueCurveAtTime(curve, t, size);
       src.connect(g);
-      if (spread > 0.01) {
+      const pan = spread > 0.01 ? (Math.random() * 2 - 1) * spread : 0;
+      if (pan) {
         const p = ctx.createStereoPanner();
-        p.pan.value = (Math.random() * 2 - 1) * spread;
-        g.connect(p); p.connect(this.tracks[3].input);
-      } else g.connect(this.tracks[3].input);
-      src.start(t, off);
+        p.pan.value = pan;
+        g.connect(p); p.connect(filter);
+      } else g.connect(filter);
+      // a reversed grain reads the mirrored region of the reversed buffer
+      src.start(t, rev ? Math.max(0, dur - off - need) : off);
       src.stop(t + size + 0.01);
+      v.lastEnd = Math.max(v.lastEnd, t + size);
+      if (this.live) {
+        const log = this.grainLog || (this.grainLog = []);
+        log.push({ t, end: t + size, off: off / dur, len: need / dur, rev, amp, pan, semis: v.note - 60 + pitch + scatter });
+        if (log.length > 600) log.splice(0, log.length - 600);
+      }
     }
 
     releaseAllNotes() {
