@@ -1,0 +1,51 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Run smoke test
+        run: node scripts/smoke-test.js
+
+  macos:
+    runs-on: macos-14
+    needs: smoke-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build universal .dmg and .zip (ad-hoc signed)
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify signature
+        run: |
+          codesign --verify --deep --verbose=2 "dist/mac-universal/Book Beat Banger.app"
+          lipo -archs "dist/mac-universal/Book Beat Banger.app/Contents/MacOS/Book Beat Banger"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Book-Beat-Banger-macOS
+          path: |
+            dist/*.dmg
+            dist/*.zip
+          if-no-files-found: error
