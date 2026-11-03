@@ -4,6 +4,8 @@
   const BBB = window.BBB, U = BBB.util;
 
   // ---------------- Parameters ----------------
+  const titleCase = (str) => str.toLowerCase().replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bLfo\b/, 'LFO');
+  BBB.titleCase = titleCase;
   class Param {
     constructor(o) {
       Object.assign(this, { curve: 'lin', mod: true, steps: 0, unit: '', group: '' }, o);
@@ -32,7 +34,20 @@
     }
     reset() { this.setNorm(this.defNorm); }
     format(v) { return this.fmt ? this.fmt(v === undefined ? this.value : v) : (v === undefined ? this.value : v).toFixed(2); }
-    get fullName() { return (this.groupLabel ? this.groupLabel + ' ' : '') + this.label; }
+    get plainLabel() { return this.plainName || titleCase(this.label); }
+    get plainGroup() { return this.plainGroupName || (this.groupLabel ? titleCase(this.groupLabel) : ''); }
+    get fullName() {
+      if (BBB.plain) return this.plainFull || ((this.plainGroup ? this.plainGroup + ' · ' : '') + this.plainLabel);
+      return (this.groupLit || this.groupLabel ? (this.groupLit || this.groupLabel) + ' · ' : '') + (this.lit || this.label);
+    }
+    get displayLabel() { return BBB.plain ? (this.plainShort || this.plainLabel) : (this.lit || this.label); }
+    get tooltip() {
+      const tech = this.tech || (this.groupLabel ? this.groupLabel.charAt(0) + this.groupLabel.slice(1).toLowerCase() + ' ' : '') + this.label.toLowerCase();
+      const lit = this.lit || this.label;
+      return BBB.plain
+        ? tech.charAt(0).toUpperCase() + tech.slice(1) + ((this.plainDesc || this.desc) ? '. ' + (this.plainDesc || this.desc) : '') + (this.lit ? '  (literary edition: “' + lit + '”)' : '')
+        : lit + ' — ' + tech + (this.desc ? '. ' + this.desc : '');
+    }
   }
   BBB.Param = Param;
 
@@ -115,7 +130,7 @@
       const r = Math.round(v);
       return Math.abs(v - r) < 0.05 ? r + '/16' : v.toFixed(2) + '/16';
     } });
-    def({ ...g('DELAY'), id: 'fx.delay.fb', label: 'FEEDBK', min: 0, max: 0.95, def: 0.45, fmt: U.fmtPct });
+    def({ ...g('DELAY'), id: 'fx.delay.fb', label: 'FEEDBACK', min: 0, max: 0.95, def: 0.45, fmt: U.fmtPct });
     def({ ...g('DELAY'), id: 'fx.delay.tone', label: 'TONE', min: 400, max: 18000, def: 4500, curve: 'exp', fmt: U.fmtHz });
     def({ ...g('REVERB'), id: 'fx.reverb.size', label: 'SIZE', min: 0.3, max: 8, def: 2.4, curve: 'exp', fmt: U.fmtSec, mod: false, audio: false });
     def({ ...g('REVERB'), id: 'fx.reverb.damp', label: 'DAMP', min: 600, max: 18000, def: 6000, curve: 'exp', fmt: U.fmtHz });
@@ -134,7 +149,7 @@
     ['1/8', 0.5], ['1/8T', 1 / 3], ['1/16', 0.25], ['1/16T', 1 / 6], ['1/32', 0.125]
   ];
   BBB.LFO_SHAPES = [
-    ['sine', 'SIN'], ['tri', 'TRI'], ['saw', 'SAW'], ['square', 'SQR'], ['sh', 'S&H'], ['drift', 'DRIFT']
+    ['sine', 'Sine', 'Sine'], ['tri', 'Triangle', 'Triangle'], ['saw', 'Saw', 'Saw'], ['square', 'Square', 'Square'], ['sh', 'Chance', 'S&H'], ['drift', 'Reverie', 'Drift']
   ];
   for (let i = 0; i < 4; i++) {
     const g = { group: 'lfo' + i, groupLabel: 'LFO ' + (i + 1), color: LFO_COLORS[i], mod: false };
@@ -159,8 +174,8 @@
     fx: { filterType: 'lowpass' },
     gran: { window: 'hann', quant: 'off', freeze: false }
   });
-  BBB.GRAIN_WINDOWS = [['hann', 'HANN'], ['gauss', 'GAUSS'], ['tri', 'TRIANGLE'], ['tukey', 'PLATEAU'], ['perc', 'PLUCK'], ['swell', 'SWELL'], ['rect', 'GATE']];
-  BBB.PITCH_QUANT = [['off', 'FREE'], ['semi', 'SEMITONE'], ['fifth', 'FIFTHS'], ['oct', 'OCTAVES'], ['penta', 'PENTATONIC'], ['minor', 'MINOR']];
+  BBB.GRAIN_WINDOWS = [['hann', 'Hann'], ['gauss', 'Gauss'], ['tri', 'Triangle'], ['tukey', 'Plateau'], ['perc', 'Pluck'], ['swell', 'Swell'], ['rect', 'Gate']];
+  BBB.PITCH_QUANT = [['off', 'Free verse', 'Free'], ['semi', 'Semitones'], ['fifth', 'Fifths'], ['oct', 'Octaves'], ['penta', 'Pentatonic'], ['minor', 'Minor']];
   BBB.AUTO_RES = 16; // automation points per beat (64 per bar)
 
   // Default pattern
@@ -181,6 +196,52 @@
     S.mods = [{ lfo: 0, param: 'gran.pos', depth: 0.18 }];
     BBB.rebuildModIndex();
   };
+
+  // ---------------- The literary vocabulary ----------------
+  // Display names (set in script) with plain descriptions for tooltips.
+  const LIT = {
+    level: ['Volume', 'How loud the track plays'], pan: ['Margin', 'Stereo position, from left margin to right'],
+    tune: ['Intone', 'Tuning in semitones'], decay: ['Coda', 'How quickly each hit fades; FULL lets it ring'],
+    start: ['Preface', 'Skip into the sample before playing'],
+    'gran.pos': ['Page', 'Position: where in the sample grains are read'], 'gran.scan': ['Pace', 'Scan: how fast the reading position travels while a note plays'],
+    'gran.spray': ['Skim', 'Spray: random scatter around the page'], 'gran.dens': ['Verbose', 'Density: grains per second'],
+    'gran.jitter': ['Stammer', 'Randomness of grain timing, from metronomic to cloud-like'],
+    'gran.size': ['Syllable', 'Length of each grain'], 'gran.sizernd': ['Ragged', 'Random variation of grain length'],
+    'gran.skew': ['Slant', 'Leans the grain window earlier or later'], 'gran.reverse': ['Verso', 'Chance that a grain reads backwards'],
+    'gran.pitch': ['Register', 'Transpose in semitones'], 'gran.fine': ['Nuance', 'Fine tuning in cents'],
+    'gran.detune': ['Aside', 'Digression: random pitch scatter per grain'],
+    'gran.attack': ['Rising', 'Attack time of each note'], 'gran.decay': ['Falling', 'Decay time down to the sustain level'],
+    'gran.sustain': ['Plot', 'Sustain level while the note is held'], 'gran.release': ['Epilogue', 'Release time after the note ends'],
+    'gran.cutoff': ['Clarity', 'Low-pass filter cutoff'], 'gran.res': ['Stress', 'Filter resonance'],
+    'gran.fenv': ['Drama', 'How far the envelope opens or closes the filter'],
+    'gran.spread': ['Breadth', 'Random stereo placement of grains'], 'gran.amprnd': ['Temper', 'Random loudness per grain'],
+    'fx.drive.amt': ['Fervour', 'Drive amount'], 'fx.drive.tone': ['Tone', 'Brightness after the drive'],
+    'fx.filter.cut': ['Censor', 'Filter cutoff frequency'], 'fx.filter.res': ['Stress', 'Filter resonance'],
+    'fx.delay.time': ['Interval', 'Delay time in sixteenth notes'], 'fx.delay.fb': ['Ibid.', 'Feedback: how often the echo repeats itself'],
+    'fx.delay.tone': ['Patina', 'Darkening of each repeat'],
+    'fx.reverb.size': ['Hall', 'Size of the room'], 'fx.reverb.damp': ['Velvet', 'Damping: how much the room absorbs'],
+    'master.vol': ['Volume', 'Master output level'], 'master.swing': ['Lilt', 'Swing: delays every second sixteenth'],
+    div: ['Tempo', 'LFO speed, synced to the beat'], hz: ['Tempo', 'LFO speed in Hz'], phase: ['Phase', 'Starting point of the LFO cycle']
+  };
+  const GROUP_LIT = { fx: null, master: 'Master', gran: 'Granular' };
+  const FX_LIT = { drive: 'Purple Prose', filter: 'Redaction', delay: 'Footnotes', reverb: 'Reading Room' };
+  BBB.FX.forEach((f) => { f.lit = FX_LIT[f.id]; });
+  BBB.FX_LIT = FX_LIT;
+  P.forEach((p, id) => {
+    const key = LIT[id] ? id : id.split('.').pop();
+    const e = LIT[key];
+    if (e) { p.lit = e[0]; p.desc = e[1]; }
+    const t = TRACKS.find((x) => x.id === p.group);
+    if (t) p.groupLit = t.title;
+    else if (p.group === 'fx') p.groupLit = FX_LIT[id.split('.')[1]];
+    else if (p.group === 'mix') { p.groupLit = FX_LIT[id.split('.')[1]]; const tr = TRACKS.find((x) => x.id === id.split('.')[2]); p.lit = tr.title; p.tech = id.split('.')[1] + ' dry/wet for ' + tr.title.toLowerCase(); p.plainFull = titleCase(id.split('.')[1]) + ' · ' + tr.title + ' dry/wet'; p.plainDesc = 'How much of this track goes through the effect'; p.desc = 'Dry ink to wet ink: how much of this chapter goes through the effect'; }
+    else if (p.group.startsWith('lfo')) p.groupLit = 'Muse ' + ['I', 'II', 'III', 'IV'][+p.group.slice(3)];
+    else if (GROUP_LIT[p.group]) p.groupLit = GROUP_LIT[p.group];
+    if (p.group === 'gran') p.plainGroupName = 'Granular';
+  });
+  const PLAIN_NAMES = { 'gran.size': 'Size', 'gran.sizernd': 'Size ±', 'gran.detune': 'Scatter', 'gran.amprnd': 'Amp ±', 'gran.fenv': 'Env Amt', 'fx.reverb.damp': 'Damping' };
+  P.get('fx.delay.fb').plainShort = 'Fdbk'; // the dial is narrow; the glossary and tooltip still say Feedback
+  for (const id in PLAIN_NAMES) P.get(id).plainName = PLAIN_NAMES[id];
 
   BBB.anySolo = () => S.tracks.some((t) => t.solo);
   BBB.trackAudible = (t) => !t.mute && (!BBB.anySolo() || t.solo);

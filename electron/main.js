@@ -47,7 +47,7 @@ async function createWindow() {
   win = new BrowserWindow({
     width: 1480,
     height: 960,
-    minWidth: 1180,
+    minWidth: 1340,
     minHeight: 760,
     backgroundColor: '#0f1013',
     title: 'Book Beat Banger',

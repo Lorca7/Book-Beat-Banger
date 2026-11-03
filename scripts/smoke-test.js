@@ -46,7 +46,43 @@ const { chromium } = require('playwright');
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 4 });
   await page.mouse.up();
   const mods = await page.evaluate(() => BBB.state.mods.map((m) => m.lfo + ':' + m.param));
-  ok(mods.includes('1:snare.tune'), 'LFO 2 dropped onto SNARE TUNE → ' + mods.join(', '));
+  ok(mods.includes('1:snare.tune'), 'Muse II (LFO 2) dropped onto Snare · Intone (tune) → ' + mods.join(', '));
+  const lit = await page.evaluate(() => ({
+    label: document.querySelector('.knob[data-param="kick.decay"] .k-label').textContent,
+    tip: document.querySelector('.knob[data-param="kick.decay"]').title.split('\n')[0],
+    font: getComputedStyle(document.querySelector('.k-label')).fontFamily,
+    fonts: ['Petit Formal Script', 'Cormorant Garamond'].map((f) => document.fonts.check('12px "' + f + '"'))
+  }));
+  ok(lit.label === 'Coda' && /decay/i.test(lit.tip) && /Petit Formal Script/.test(lit.font) && lit.fonts.every(Boolean),
+    `literary script labels with plain tooltips (“${lit.label}” — ${lit.tip})`);
+  // ---- literary ⇄ plain switch ----
+  const read = () => page.evaluate(() => ({
+    knob: document.querySelector('.knob[data-param="kick.decay"] .k-label').textContent,
+    gran: document.querySelector('.knob[data-param="gran.pos"] .k-label').textContent,
+    publish: document.querySelector('.file-btns .btn.accent').textContent,
+    editor: document.querySelector('.editor .panel-title').textContent,
+    lfo: document.querySelector('.lfo-name').textContent,
+    section: [...document.querySelectorAll('.gsec-title')].map((e) => e.textContent).join(','),
+    fx: document.querySelector('.fxm-name').textContent,
+    plainClass: document.body.classList.contains('plain'),
+    stored: localStorage.getItem('bbb.plain')
+  }));
+  await page.click('.lexicon .lex-opt.plain');
+  const pl = await read();
+  ok(pl.plainClass && pl.knob === 'Decay' && pl.gran === 'Position' && pl.publish === 'Export WAV' && pl.editor === 'Sample Editor' &&
+    pl.lfo === 'LFO 1' && pl.section.includes('Envelope') && pl.fx === 'Drive' && pl.stored === '1',
+    `Plain switch shows technical names (${pl.knob}, ${pl.gran}, ${pl.publish}, ${pl.editor}, ${pl.lfo}, ${pl.fx})`);
+  await page.click('.btn.library'); await page.click('.ctxmenu .item:has-text("Help & glossary")');
+  const gl = await page.evaluate(() => [...document.querySelectorAll('.gloss-row')].map((r) => r.textContent));
+  ok(gl.length > 40 && gl.some((t) => t.startsWith('Ibid.') && /feedback/i.test(t)) && gl.some((t) => t.startsWith('Purple Prose')), `Help includes a ${gl.length}-entry glossary (e.g. “${gl.find((t) => t.startsWith('Ibid.'))}”)`);
+  if (shots) await page.screenshot({ path: path.join(shots, '07-glossary.png') });
+  await page.keyboard.press('Escape');
+  if (shots) await page.screenshot({ path: path.join(shots, '08-plain.png') });
+  await page.keyboard.press('l');
+  const li = await read();
+  ok(!li.plainClass && li.knob === 'Coda' && li.gran === 'Page' && li.publish === 'Publish' && li.editor === 'Manuscript' && li.lfo === 'Muse I' && li.stored === '0',
+    `L key returns to the literary edition (${li.knob}, ${li.gran}, ${li.publish}, ${li.editor}, ${li.lfo})`);
+
   // modulate an audio-rate param too
   await page.evaluate(() => BBB.addMod(2, 'fx.filter.cut', 0.4));
   await page.waitForTimeout(400);
@@ -97,7 +133,7 @@ const { chromium } = require('playwright');
 
   // edit: reverse + gain, check processed buffer changes
   const v0 = await page.evaluate(() => BBB.state.tracks[2].sample.version);
-  await page.click('.editor .btn.toggle:has-text("REVERSE")');
+  await page.click('.editor .btn.toggle:has-text("Backwards")');
   const v1 = await page.evaluate(() => ({ v: BBB.state.tracks[2].sample.version, rev: BBB.state.tracks[2].sample.reverse }));
   ok(v1.v > v0 && v1.rev, 'reverse edit re-processes the sample');
   // drag the start handle of the waveform
@@ -110,7 +146,7 @@ const { chromium } = require('playwright');
   ok(startAfter > startBefore, `dragging the start handle trims (${startBefore.toFixed(3)} → ${startAfter.toFixed(3)} s)`);
 
   // ---- granular editor view ----
-  await page.click('.editor .tab:has-text("GRANULAR")');
+  await page.click('.editor .tab[title*="Granular"]');
   await page.keyboard.down('a'); await page.waitForTimeout(400);
   const voices = await page.evaluate(() => BBB.engine.voices.length);
   await page.keyboard.up('a');
@@ -181,7 +217,7 @@ const { chromium } = require('playwright');
   await page.evaluate(() => { BBB.state.gran.freeze = false; BBB.state.gran.window = 'hann'; BBB.state.gran.quant = 'off'; });
 
   // ---- export dialog through the UI ----
-  await page.click('.btn.accent:has-text("EXPORT WAV")');
+  await page.click('.btn.accent:has-text("Publish")');
   const dl = page.waitForEvent('download', { timeout: 20000 });
   await page.click('.modal .btn.accent');
   const file = await dl;

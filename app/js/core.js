@@ -10,9 +10,9 @@
     ink: '#33241a', inkSoft: 'rgba(51,36,26,0.55)', rule: 'rgba(51,36,26,0.14)', ruleStrong: 'rgba(51,36,26,0.32)',
     shade: 'rgba(60,40,22,0.30)', gold: '#c9a456', goldDeep: '#8a6a2a', ivory: '#fbf5e6', ebony: '#2a1f17',
     oxblood: '#5a1d18', marker: '#a8322a',
-    serif: '"EB Garamond", "Iowan Old Style", Baskerville, Georgia, serif',
-    fell: '"IM Fell English", "EB Garamond", Georgia, serif',
-    type: '"Courier Prime", "American Typewriter", "Courier New", monospace',
+    serif: '"Cormorant Garamond", "EB Garamond", Baskerville, Georgia, serif',
+    script: '"Petit Formal Script", "Snell Roundhand", cursive',
+    type: '"Cormorant Garamond", "EB Garamond", Georgia, serif',
     gran: '#7a4f9e'
   };
 
@@ -52,6 +52,25 @@
   BBB.off = (evt, fn) => { const l = listeners[evt]; if (l) { const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); } };
   BBB.emit = (evt, ...args) => { const l = listeners[evt]; if (l) l.slice().forEach((fn) => fn(...args)); };
 
+  // ---------- Literary ⇄ plain terminology ----------
+  // Every literary label has a plain technical twin. BBB.plain switches between them.
+  BBB.plain = false;
+  try { BBB.plain = localStorage.getItem('bbb.plain') === '1'; } catch (e) { /* storage unavailable */ }
+  BBB.t = (lit, plain) => (BBB.plain ? plain : lit);
+  /** Bind an element's text to a literary/plain pair; it updates whenever the mode changes. */
+  BBB.term = (el, lit, plain) => {
+    el.dataset.lit = lit; el.dataset.plain = plain;
+    el.textContent = BBB.t(lit, plain);
+    return el;
+  };
+  BBB.setPlain = (on) => {
+    BBB.plain = !!on;
+    try { localStorage.setItem('bbb.plain', BBB.plain ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+    document.body.classList.toggle('plain', BBB.plain);
+    document.querySelectorAll('[data-plain]').forEach((el) => { el.textContent = BBB.plain ? el.dataset.plain : el.dataset.lit; });
+    BBB.emit('terms', BBB.plain);
+  };
+
   // ---------- DOM helper ----------
   BBB.el = (tag, attrs, children) => {
     const e = document.createElement(tag);
@@ -65,6 +84,7 @@
         }
         else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
         else if (k === 'text') e.textContent = v;
+        else if (k === 'term') BBB.term(e, v[0], v[1]);
         else if (k === 'html') e.innerHTML = v;
         else e.setAttribute(k, v === true ? '' : v);
       }

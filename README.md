@@ -2,11 +2,15 @@
 
 A boutique, book‑themed 4‑track sampling drum machine for macOS (built for **macOS Sonoma 14.6**, runs on Apple Silicon and Intel).
 
-The interface is styled like a private library. The header is an oxblood book spine. The sequencer is a parchment ledger, and each track is a numbered chapter. The sample editor, effects and modulation sections are gold‑tooled leather volumes. Typography is set in EB Garamond, IM Fell English and Courier Prime; the fonts are bundled, so the app works offline.
+The interface is styled like a private library. The header is an oxblood book spine. The sequencer is a parchment ledger, and each track is a numbered chapter. The sample editor, effects and modulation sections are gold‑tooled leather volumes. Labels are in Petit Formal Script, an 18th‑century‑style formal hand, and figures in Cormorant Garamond; both fonts are bundled, so the app works offline.
 
 ![tracks](build/icon.png)
 
 **Kick · Snare · Hi‑Hat · Granular Synth**: each track has a 16‑step sequencer, and you can record your own sound into any of them from the microphone. The recorded sound is trimmed automatically and is ready to play as soon as you stop recording.
+
+### Literary or plain names
+
+Every control has two names: a literary one written in script (*Coda*, *Page*, *Purple Prose*, *Footnotes*, *Ibid.*, *The Muses*…) and its plain technical name (Decay, Position, Drive, Delay, Feedback, LFOs…). Use the **Literary | Plain** switch in the top bar, or press **L**, to flip every label, button, menu and message between the two. The app remembers your choice. Tooltips always show both names, and **Library ▾ → Index & glossary** lists every literary name next to what it does.
 
 ## Features
 
@@ -32,6 +36,7 @@ The interface is styled like a private library. The header is an oxblood book sp
 | 1 · 2 · 3 | Kick / snare / hi‑hat |
 | A W S E D F T G Y H U J K | Granular synth, chromatic (Z / X = octave) |
 | R | Record into the selected track |
+| L | Switch between literary and plain names |
 | P | Preview the selected sample |
 | Esc | Cancel recording |
 | ⌘S · ⌘O · ⌘E · ⌘N | Save · Open · Export WAV · New |
@@ -77,7 +82,7 @@ The same engine runs for live playback and for offline WAV export, so an export 
 
 ## Fonts
 
-EB Garamond, IM Fell English and Courier Prime are bundled in `app/fonts` under the SIL Open Font License 1.1 (licence texts are alongside).
+Petit Formal Script and Cormorant Garamond are bundled in `app/fonts` under the SIL Open Font License 1.1 (licence texts are alongside).
 
 ## Tests
 
