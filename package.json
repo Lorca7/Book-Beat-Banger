@@ -9,8 +9,8 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --mac",
-    "dist:dir": "electron-builder --mac --dir",
+    "dist": "electron-builder --mac --publish never",
+    "dist:dir": "electron-builder --mac --dir --publish never",
     "test": "node scripts/smoke-test.js"
   },
   "devDependencies": {
