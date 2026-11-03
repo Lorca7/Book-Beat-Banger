@@ -24,6 +24,7 @@
     "directories": { "output": "dist", "buildResources": "build" },
     "files": ["electron/**/*", "app/**/*", "package.json"],
     "afterPack": "scripts/after-pack.js",
+    "artifactName": "Book-Beat-Banger-${version}-${arch}.${ext}",
     "mac": {
       "category": "public.app-category.music",
       "minimumSystemVersion": "12.0",
