@@ -7,8 +7,8 @@
     constructor(host) {
       this.el = BBB.el('div', { class: 'panel lfos leather binding-green' });
       this.el.appendChild(BBB.el('div', { class: 'panel-head' }, [
-        BBB.el('div', { class: 'panel-title', html: '<span class="orn">❧</span> Modulation' }),
-        BBB.el('div', { class: 'hint', text: 'drag ◉ onto any knob · drag a target ↔ for depth' })
+        BBB.el('div', { class: 'panel-title', html: 'The Muses' }),
+        BBB.el('div', { class: 'hint', text: 'LFOs · drag a muse onto any dial' })
       ]));
       const grid = BBB.el('div', { class: 'lfo-grid' });
       this.cards = [0, 1, 2, 3].map((i) => this.makeCard(i, grid));
@@ -21,13 +21,13 @@
     makeCard(i, grid) {
       const L = S.lfos[i], color = BBB.LFO_COLORS[i];
       const card = BBB.el('div', { class: 'lfo', style: { '--lc': color } });
-      const handle = BBB.el('div', { class: 'lfo-handle', title: 'Drag onto any knob to modulate it', text: '◉' });
+      const handle = BBB.el('div', { class: 'lfo-handle', title: 'Drag this muse onto any dial to inspire (modulate) it', text: '✒' });
       const scope = BBB.el('canvas', { class: 'lfo-scope', width: 240, height: 80, title: 'Click to change the waveform' });
       const shapeBtn = BBB.el('button', { class: 'shape on lfo-shape', title: 'Waveform' });
       const pickShape = (x, y) => BBB.contextMenu(x, y, BBB.LFO_SHAPES.map(([id, label]) => ({
         label: label + (L.shape === id ? '  ✓' : ''), color, fn: () => { L.shape = id; showShape(); BBB.emit('lfo'); }
       })));
-      const showShape = () => { shapeBtn.textContent = (BBB.LFO_SHAPES.find((x) => x[0] === L.shape) || ['', '?'])[1] + ' ▾'; };
+      const showShape = () => { shapeBtn.textContent = (BBB.LFO_SHAPES.find((x) => x[0] === L.shape) || ['', '?'])[1] ; };
       shapeBtn.addEventListener('click', (e) => { const r = shapeBtn.getBoundingClientRect(); pickShape(r.left, r.bottom + 2); });
       scope.addEventListener('click', () => {
         const k = BBB.LFO_SHAPES.findIndex((x) => x[0] === L.shape);
@@ -38,14 +38,14 @@
       const divK = new BBB.Knob(BBB.param(`lfo${i}.div`), { size: 32, small: true, color });
       const hzK = new BBB.Knob(BBB.param(`lfo${i}.hz`), { size: 32, small: true, color });
       const phK = new BBB.Knob(BBB.param(`lfo${i}.phase`), { size: 32, small: true, color });
-      const sync = BBB.el('button', { class: 'shape lfo-sync' + (L.sync ? ' on' : ''), text: 'SYNC', title: 'Sync rate to tempo' });
+      const sync = BBB.el('button', { class: 'shape lfo-sync' + (L.sync ? ' on' : ''), text: 'Sync', title: 'Sync the rate to the tempo' });
       const showRate = () => { divK.el.style.display = L.sync ? '' : 'none'; hzK.el.style.display = L.sync ? 'none' : ''; sync.classList.toggle('on', L.sync); showShape(); };
       sync.addEventListener('click', () => { L.sync = !L.sync; showRate(); BBB.emit('lfo'); });
       showRate();
       knobHost.appendChild(divK.el); knobHost.appendChild(hzK.el); knobHost.appendChild(phK.el);
       const targets = BBB.el('div', { class: 'targets' });
       card.appendChild(BBB.el('div', { class: 'lfo-id' }, [
-        BBB.el('div', { class: 'lfo-idtop' }, [BBB.el('div', { class: 'lfo-name', text: 'LFO ' + (i + 1) }), handle]),
+        BBB.el('div', { class: 'lfo-idtop' }, [BBB.el('div', { class: 'lfo-name', text: BBB.MUSES[i], title: 'LFO ' + (i + 1) }), handle]),
         BBB.el('div', { class: 'lfo-idbot' }, [sync, shapeBtn])
       ]));
       card.appendChild(scope);
@@ -67,7 +67,7 @@
       handle.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
-        const ghost = BBB.el('div', { class: 'lfo-ghost', style: { background: color }, text: String(i + 1) });
+        const ghost = BBB.el('div', { class: 'lfo-ghost', style: { background: color }, text: ['I', 'II', 'III', 'IV'][i] });
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         line.setAttribute('class', 'lfo-cable');
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -100,7 +100,7 @@
             const id = hover.dataset.param;
             const ok = BBB.addMod(i, id, 0.25);
             const p = BBB.param(id);
-            BBB.toast(ok ? `LFO ${i + 1} → ${p.fullName}` : `LFO ${i + 1} already modulates ${p.fullName}`);
+            BBB.toast(ok ? `${BBB.MUSES[i]} now inspires ${p.fullName}` : `${BBB.MUSES[i]} already inspires ${p.fullName}`);
             hover.classList.add('drop-flash');
             const h = hover;
             setTimeout(() => h.classList.remove('drop-flash'), 500);
@@ -118,7 +118,7 @@
         const host = c.targets;
         host.innerHTML = '';
         const mods = S.mods.filter((m) => m.lfo === i);
-        if (!mods.length) { host.appendChild(BBB.el('div', { class: 'empty', text: 'drag ◉ to a knob' })); return; }
+        if (!mods.length) { host.appendChild(BBB.el('div', { class: 'empty', text: 'awaiting a subject' })); return; }
         mods.forEach((m) => {
           const p = BBB.param(m.param);
           const bar = BBB.el('div', { class: 'chip-bar' });
@@ -129,7 +129,7 @@
             bar.style.left = (m.depth >= 0 ? 50 : 50 - w) + '%'; bar.style.width = w + '%';
           };
           show();
-          const chip = BBB.el('div', { class: 'chip', title: p.fullName + '\nDrag ↔ to set depth · Double-click = 25% · × removes' }, [
+          const chip = BBB.el('div', { class: 'chip', title: p.fullName + '\nDrag ↔ to set the depth · double-click for 25% · × dismisses' }, [
             bar, BBB.el('span', { class: 'chip-name', text: p.fullName, style: { color: p.trackColor || (BBB.TRACKS.some((t) => t.id === p.group) ? p.color : BBB.THEME.ink) } }), val,
             BBB.el('button', { class: 'x', text: '×', title: 'Remove', onclick: (e) => { e.stopPropagation(); BBB.removeMod(i, m.param); } })
           ]);

@@ -17,6 +17,27 @@
   };
 
   BBB.knobs = new Map(); // param id -> Knob[]
+  BBB.MUSES = ['Muse I', 'Muse II', 'Muse III', 'Muse IV'];
+
+  // Shared gradients for brass (on leather) and ivory enamel (on paper) dial faces.
+  let defsDone = false;
+  const ensureDefs = () => {
+    if (defsDone) return;
+    defsDone = true;
+    const host = svg('svg', { width: 0, height: 0, style: 'position:absolute;width:0;height:0', 'aria-hidden': 'true' });
+    host.innerHTML = `<defs>
+      <radialGradient id="kb-brass-face" cx="38%" cy="30%" r="80%">
+        <stop offset="0" stop-color="#fbeec2"/><stop offset=".35" stop-color="#dcb965"/><stop offset=".8" stop-color="#9c7630"/><stop offset="1" stop-color="#6e521f"/></radialGradient>
+      <linearGradient id="kb-brass-rim" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff1c4"/><stop offset=".5" stop-color="#a98436"/><stop offset="1" stop-color="#4a3512"/></linearGradient>
+      <radialGradient id="kb-ivory-face" cx="38%" cy="30%" r="85%">
+        <stop offset="0" stop-color="#fffdf6"/><stop offset=".55" stop-color="#f1e6cd"/><stop offset="1" stop-color="#c8b28a"/></radialGradient>
+      <linearGradient id="kb-ivory-rim" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fffaf0"/><stop offset=".55" stop-color="#b59a6a"/><stop offset="1" stop-color="#6f5634"/></linearGradient>
+      <filter id="kb-shadow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy=".9" stdDeviation=".8" flood-color="#1a0f08" flood-opacity=".55"/></filter>
+    </defs>`;
+    document.body.appendChild(host);
+  };
 
   class Knob {
     /**
@@ -24,27 +45,47 @@
      */
     constructor(model, opts) {
       opts = opts || {};
+      ensureDefs();
       this.p = model;
       this.size = opts.size || 44;
       this.color = opts.color || model.color || '#ddd';
       this.isParam = model instanceof BBB.Param;
-      const label = opts.label || model.label;
+      const label = opts.label || model.displayLabel || model.label;
       const c = this.size / 2;
       this.c = c;
-      const el = (this.el = BBB.el('div', { class: 'knob' + (opts.small ? ' small' : ''), title: (model.fullName || label) + (this.isParam && model.mod ? '\nDrag ↕ · Shift = fine · Double-click = reset · Right-click = menu · Drop an LFO here to modulate' : '\nDrag ↕ · Double-click = reset') }));
+      const help = this.isParam && model.mod
+        ? '\nDrag ↕ (Shift for fine) · double-click to restore · right-click for more · drop a Muse here to inspire it'
+        : '\nDrag ↕ · double-click to restore';
+      const el = (this.el = BBB.el('div', { class: 'knob' + (opts.small ? ' small' : ''), title: (model.tooltip || model.fullName || label) + help }));
       el.style.setProperty('--kc', this.color);
       if (this.isParam) { el.dataset.param = model.id; if (model.mod) el.dataset.mod = '1'; }
       if (!opts.nolabel) el.appendChild(BBB.el('div', { class: 'k-label', text: label }));
       const s = (this.svg = svg('svg', { width: this.size, height: this.size, viewBox: `0 0 ${this.size} ${this.size}`, class: 'k-svg' }));
-      const r = c - 5;
-      this.r = r;
-      s.appendChild(svg('circle', { cx: c, cy: c, r: r - 4, class: 'k-body' }));
-      s.appendChild(svg('path', { d: arc(0, 1, r, c), class: 'k-track' }));
+      // geometry of an engraved instrument dial
+      const R = c - 1.5;
+      this.R = R;
+      this.rArc = R - 4.6;
+      this.rFace = R - 6.8;
+      // engraved scale
+      let ticks = '';
+      for (let i = 0; i <= 20; i++) {
+        const n = i / 20, major = i % 5 === 0;
+        const [x0, y0] = pt(ang(n), R - (major ? 3.4 : 1.9), c), [x1, y1] = pt(ang(n), R, c);
+        ticks += `M${x0.toFixed(2)} ${y0.toFixed(2)}L${x1.toFixed(2)} ${y1.toFixed(2)}`;
+      }
+      s.appendChild(svg('path', { d: ticks, class: 'k-ticks' }));
+      s.appendChild(svg('path', { d: arc(0, 1, this.rArc, c), class: 'k-track' }));
       this.valArc = svg('path', { class: 'k-val' });
+      s.appendChild(this.valArc);
+      // bevelled face with a faint guilloché ring
+      s.appendChild(svg('circle', { cx: c, cy: c, r: this.rFace, class: 'k-body' }));
+      s.appendChild(svg('circle', { cx: c, cy: c, r: this.rFace * 0.66, class: 'k-guilloche' }));
+      s.appendChild(svg('circle', { cx: c, cy: c, r: this.rFace * 0.36, class: 'k-guilloche' }));
       this.modArc = svg('path', { class: 'k-mod' });
-      this.ptr = svg('line', { class: 'k-ptr' });
-      this.modDot = svg('circle', { r: 2.2, class: 'k-moddot' });
-      s.appendChild(this.valArc); s.appendChild(this.modArc); s.appendChild(this.ptr); s.appendChild(this.modDot);
+      this.ptr = svg('path', { class: 'k-ptr' });
+      this.jewel = svg('circle', { cx: c, cy: c, r: Math.max(1.6, this.size * 0.05), class: 'k-jewel' });
+      this.modDot = svg('circle', { r: 2.1, class: 'k-moddot' });
+      s.appendChild(this.modArc); s.appendChild(this.ptr); s.appendChild(this.jewel); s.appendChild(this.modDot);
       el.appendChild(s);
       this.valueEl = BBB.el('div', { class: 'k-value' });
       el.appendChild(this.valueEl);
@@ -98,15 +139,15 @@
       el.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (!this.isParam) { p.setNorm(p.defNorm); return; }
-        const items = [{ label: 'Reset to default', fn: () => p.setNorm(p.defNorm) }];
-        if (S.auto.lanes[p.id]) items.push({ label: 'Clear automation', fn: () => BBB.clearLane(p.id) });
+        const items = [{ label: 'Restore the original', fn: () => p.setNorm(p.defNorm) }];
+        if (S.auto.lanes[p.id]) items.push({ label: 'Erase annotations (automation)', fn: () => BBB.clearLane(p.id) });
         if (p.mod) {
           items.push({ sep: true });
           for (let i = 0; i < 4; i++) {
             const has = S.mods.find((m) => m.lfo === i && m.param === p.id);
             items.push(has
-              ? { label: `Remove LFO ${i + 1}`, color: BBB.LFO_COLORS[i], fn: () => BBB.removeMod(i, p.id) }
-              : { label: `Modulate with LFO ${i + 1}`, color: BBB.LFO_COLORS[i], fn: () => BBB.addMod(i, p.id, 0.25) });
+              ? { label: `Dismiss ${BBB.MUSES[i]}`, color: BBB.LFO_COLORS[i], fn: () => BBB.removeMod(i, p.id) }
+              : { label: `Inspire with ${BBB.MUSES[i]}`, color: BBB.LFO_COLORS[i], fn: () => BBB.addMod(i, p.id, 0.25) });
           }
         }
         BBB.contextMenu(e.clientX, e.clientY, items);
@@ -120,8 +161,8 @@
       if (key === this.badgeKey) return;
       this.badgeKey = key;
       this.badges.innerHTML = '';
-      mods.forEach((m) => this.badges.appendChild(BBB.el('span', { class: 'k-dot', style: { background: BBB.LFO_COLORS[m.lfo] }, title: 'LFO ' + (m.lfo + 1) })));
-      if (lane) this.badges.appendChild(BBB.el('span', { class: 'k-auto', text: 'A', title: 'Automated — right-click to clear' }));
+      mods.forEach((m) => this.badges.appendChild(BBB.el('span', { class: 'k-dot', style: { background: BBB.LFO_COLORS[m.lfo] }, title: 'Inspired by ' + BBB.MUSES[m.lfo] })));
+      if (lane) this.badges.appendChild(BBB.el('span', { class: 'k-auto', text: '✎', title: 'Annotated (automated) — right-click to erase' }));
       this.el.classList.toggle('modded', mods.length > 0);
       this.el.classList.toggle('automated', !!lane);
     }
@@ -133,19 +174,20 @@
       const rk = range ? Math.round(range[0] * 500) + ':' + Math.round(range[1] * 500) : '';
       if (L.b === b && L.e === e && L.rk === rk && L.mc === modColor) return;
       L.b = b; L.e = e; L.rk = rk; L.mc = modColor;
-      const c = this.c, r = this.r;
+      const c = this.c, R = this.R;
       const from = this.bipolar != null ? this.bipolar : 0;
-      this.valArc.setAttribute('d', arc(from, base, r, c));
+      this.valArc.setAttribute('d', arc(from, base, this.rArc, c));
+      // slender needle with a short counterweight tail
       const a = ang(base);
-      const [x0, y0] = pt(a, r * 0.18, c), [x1, y1] = pt(a, r - 6, c);
-      this.ptr.setAttribute('x1', x0); this.ptr.setAttribute('y1', y0); this.ptr.setAttribute('x2', x1); this.ptr.setAttribute('y2', y1);
+      const [tx, ty] = pt(a + 180, this.rFace * 0.42, c), [nx, ny] = pt(a, this.rArc + 0.6, c);
+      this.ptr.setAttribute('d', `M${tx.toFixed(2)} ${ty.toFixed(2)}L${nx.toFixed(2)} ${ny.toFixed(2)}`);
       if (range) {
-        this.modArc.setAttribute('d', arc(range[0], range[1], r + 3.2, c));
+        this.modArc.setAttribute('d', arc(range[0], range[1], R + 2, c));
         this.modArc.style.stroke = modColor;
         this.modArc.style.display = '';
       } else this.modArc.style.display = 'none';
       if (eff != null) {
-        const [dx, dy] = pt(ang(eff), r + 3.2, c);
+        const [dx, dy] = pt(ang(eff), R + 2, c);
         this.modDot.setAttribute('cx', dx); this.modDot.setAttribute('cy', dy);
         this.modDot.style.fill = modColor || '#fff';
         this.modDot.style.display = '';

@@ -46,7 +46,15 @@ const { chromium } = require('playwright');
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 4 });
   await page.mouse.up();
   const mods = await page.evaluate(() => BBB.state.mods.map((m) => m.lfo + ':' + m.param));
-  ok(mods.includes('1:snare.tune'), 'LFO 2 dropped onto SNARE TUNE → ' + mods.join(', '));
+  ok(mods.includes('1:snare.tune'), 'Muse II (LFO 2) dropped onto Snare · Intone (tune) → ' + mods.join(', '));
+  const lit = await page.evaluate(() => ({
+    label: document.querySelector('.knob[data-param="kick.decay"] .k-label').textContent,
+    tip: document.querySelector('.knob[data-param="kick.decay"]').title.split('\n')[0],
+    font: getComputedStyle(document.querySelector('.k-label')).fontFamily,
+    fonts: ['Petit Formal Script', 'Cormorant Garamond'].map((f) => document.fonts.check('12px "' + f + '"'))
+  }));
+  ok(lit.label === 'Coda' && /decay/i.test(lit.tip) && /Petit Formal Script/.test(lit.font) && lit.fonts.every(Boolean),
+    `literary script labels with plain tooltips (“${lit.label}” — ${lit.tip})`);
   // modulate an audio-rate param too
   await page.evaluate(() => BBB.addMod(2, 'fx.filter.cut', 0.4));
   await page.waitForTimeout(400);
@@ -97,7 +105,7 @@ const { chromium } = require('playwright');
 
   // edit: reverse + gain, check processed buffer changes
   const v0 = await page.evaluate(() => BBB.state.tracks[2].sample.version);
-  await page.click('.editor .btn.toggle:has-text("REVERSE")');
+  await page.click('.editor .btn.toggle:has-text("Backwards")');
   const v1 = await page.evaluate(() => ({ v: BBB.state.tracks[2].sample.version, rev: BBB.state.tracks[2].sample.reverse }));
   ok(v1.v > v0 && v1.rev, 'reverse edit re-processes the sample');
   // drag the start handle of the waveform
@@ -110,7 +118,7 @@ const { chromium } = require('playwright');
   ok(startAfter > startBefore, `dragging the start handle trims (${startBefore.toFixed(3)} → ${startAfter.toFixed(3)} s)`);
 
   // ---- granular editor view ----
-  await page.click('.editor .tab:has-text("GRANULAR")');
+  await page.click('.editor .tab[title*="Granular"]');
   await page.keyboard.down('a'); await page.waitForTimeout(400);
   const voices = await page.evaluate(() => BBB.engine.voices.length);
   await page.keyboard.up('a');
@@ -181,7 +189,7 @@ const { chromium } = require('playwright');
   await page.evaluate(() => { BBB.state.gran.freeze = false; BBB.state.gran.window = 'hann'; BBB.state.gran.quant = 'off'; });
 
   // ---- export dialog through the UI ----
-  await page.click('.btn.accent:has-text("EXPORT WAV")');
+  await page.click('.btn.accent:has-text("Publish")');
   const dl = page.waitForEvent('download', { timeout: 20000 });
   await page.click('.modal .btn.accent');
   const file = await dl;

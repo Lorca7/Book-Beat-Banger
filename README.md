@@ -2,7 +2,7 @@
 
 A boutique, book‑themed 4‑track sampling drum machine for macOS (built for **macOS Sonoma 14.6**, runs on Apple Silicon and Intel).
 
-The interface is styled like a private library. The header is an oxblood book spine. The sequencer is a parchment ledger, and each track is a numbered chapter. The sample editor, effects and modulation sections are gold‑tooled leather volumes. Typography is set in EB Garamond, IM Fell English and Courier Prime; the fonts are bundled, so the app works offline.
+The interface is styled like a private library. The header is an oxblood book spine. The sequencer is a parchment ledger, and each track is a numbered chapter. The sample editor, effects and modulation sections are gold‑tooled leather volumes. Labels are in Petit Formal Script, an 18th‑century‑style formal hand, and figures in Cormorant Garamond; both fonts are bundled, so the app works offline.
 
 ![tracks](build/icon.png)
 
@@ -77,7 +77,7 @@ The same engine runs for live playback and for offline WAV export, so an export 
 
 ## Fonts
 
-EB Garamond, IM Fell English and Courier Prime are bundled in `app/fonts` under the SIL Open Font License 1.1 (licence texts are alongside).
+Petit Formal Script and Cormorant Garamond are bundled in `app/fonts` under the SIL Open Font License 1.1 (licence texts are alongside).
 
 ## Tests
 
