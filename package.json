@@ -1,0 +1,51 @@
+{
+  "name": "book-beat-banger",
+  "productName": "Book Beat Banger",
+  "version": "1.0.0",
+  "description": "4-track drum machine with live sample recording, granular synth, effects, LFOs, automation and WAV export.",
+  "main": "electron/main.js",
+  "author": "Book Beat Banger",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac --publish never",
+    "dist:dir": "electron-builder --mac --dir --publish never",
+    "test": "node scripts/smoke-test.js"
+  },
+  "devDependencies": {
+    "electron": "44.10.1",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.bookbeatbanger.app",
+    "productName": "Book Beat Banger",
+    "copyright": "Book Beat Banger",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["electron/**/*", "app/**/*", "package.json"],
+    "afterPack": "scripts/after-pack.js",
+    "artifactName": "Book-Beat-Banger-${version}-${arch}.${ext}",
+    "mac": {
+      "category": "public.app-category.music",
+      "minimumSystemVersion": "12.0",
+      "target": [
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Book Beat Banger uses the microphone so you can record your own samples into the drum tracks and the granular synth.",
+        "LSApplicationCategoryType": "public.app-category.music"
+      }
+    },
+    "dmg": {
+      "title": "Book Beat Banger",
+      "contents": [
+        { "x": 140, "y": 180 },
+        { "x": 400, "y": 180, "type": "link", "path": "/Applications" }
+      ]
+    }
+  }
+}
