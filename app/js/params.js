@@ -4,6 +4,8 @@
   const BBB = window.BBB, U = BBB.util;
 
   // ---------------- Parameters ----------------
+  const titleCase = (str) => str.toLowerCase().replace(/(^|[\s/-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bLfo\b/, 'LFO');
+  BBB.titleCase = titleCase;
   class Param {
     constructor(o) {
       Object.assign(this, { curve: 'lin', mod: true, steps: 0, unit: '', group: '' }, o);
@@ -32,11 +34,19 @@
     }
     reset() { this.setNorm(this.defNorm); }
     format(v) { return this.fmt ? this.fmt(v === undefined ? this.value : v) : (v === undefined ? this.value : v).toFixed(2); }
-    get fullName() { return (this.groupLit || this.groupLabel ? (this.groupLit || this.groupLabel) + ' · ' : '') + (this.lit || this.label); }
-    get displayLabel() { return this.lit || this.label; }
+    get plainLabel() { return this.plainName || titleCase(this.label); }
+    get plainGroup() { return this.plainGroupName || (this.groupLabel ? titleCase(this.groupLabel) : ''); }
+    get fullName() {
+      if (BBB.plain) return this.plainFull || ((this.plainGroup ? this.plainGroup + ' · ' : '') + this.plainLabel);
+      return (this.groupLit || this.groupLabel ? (this.groupLit || this.groupLabel) + ' · ' : '') + (this.lit || this.label);
+    }
+    get displayLabel() { return BBB.plain ? (this.plainShort || this.plainLabel) : (this.lit || this.label); }
     get tooltip() {
       const tech = this.tech || (this.groupLabel ? this.groupLabel.charAt(0) + this.groupLabel.slice(1).toLowerCase() + ' ' : '') + this.label.toLowerCase();
-      return (this.lit || this.label) + ' — ' + tech + (this.desc ? '. ' + this.desc : '');
+      const lit = this.lit || this.label;
+      return BBB.plain
+        ? tech.charAt(0).toUpperCase() + tech.slice(1) + ((this.plainDesc || this.desc) ? '. ' + (this.plainDesc || this.desc) : '') + (this.lit ? '  (literary edition: “' + lit + '”)' : '')
+        : lit + ' — ' + tech + (this.desc ? '. ' + this.desc : '');
     }
   }
   BBB.Param = Param;
@@ -139,7 +149,7 @@
     ['1/8', 0.5], ['1/8T', 1 / 3], ['1/16', 0.25], ['1/16T', 1 / 6], ['1/32', 0.125]
   ];
   BBB.LFO_SHAPES = [
-    ['sine', 'Sine'], ['tri', 'Triangle'], ['saw', 'Saw'], ['square', 'Square'], ['sh', 'Chance'], ['drift', 'Reverie']
+    ['sine', 'Sine', 'Sine'], ['tri', 'Triangle', 'Triangle'], ['saw', 'Saw', 'Saw'], ['square', 'Square', 'Square'], ['sh', 'Chance', 'S&H'], ['drift', 'Reverie', 'Drift']
   ];
   for (let i = 0; i < 4; i++) {
     const g = { group: 'lfo' + i, groupLabel: 'LFO ' + (i + 1), color: LFO_COLORS[i], mod: false };
@@ -165,7 +175,7 @@
     gran: { window: 'hann', quant: 'off', freeze: false }
   });
   BBB.GRAIN_WINDOWS = [['hann', 'Hann'], ['gauss', 'Gauss'], ['tri', 'Triangle'], ['tukey', 'Plateau'], ['perc', 'Pluck'], ['swell', 'Swell'], ['rect', 'Gate']];
-  BBB.PITCH_QUANT = [['off', 'Free verse'], ['semi', 'Semitones'], ['fifth', 'Fifths'], ['oct', 'Octaves'], ['penta', 'Pentatonic'], ['minor', 'Minor']];
+  BBB.PITCH_QUANT = [['off', 'Free verse', 'Free'], ['semi', 'Semitones'], ['fifth', 'Fifths'], ['oct', 'Octaves'], ['penta', 'Pentatonic'], ['minor', 'Minor']];
   BBB.AUTO_RES = 16; // automation points per beat (64 per bar)
 
   // Default pattern
@@ -224,10 +234,14 @@
     const t = TRACKS.find((x) => x.id === p.group);
     if (t) p.groupLit = t.title;
     else if (p.group === 'fx') p.groupLit = FX_LIT[id.split('.')[1]];
-    else if (p.group === 'mix') { p.groupLit = FX_LIT[id.split('.')[1]]; const tr = TRACKS.find((x) => x.id === id.split('.')[2]); p.lit = tr.title; p.tech = id.split('.')[1] + ' dry/wet for ' + tr.title.toLowerCase(); p.desc = 'Dry ink to wet ink: how much of this chapter goes through the effect'; }
+    else if (p.group === 'mix') { p.groupLit = FX_LIT[id.split('.')[1]]; const tr = TRACKS.find((x) => x.id === id.split('.')[2]); p.lit = tr.title; p.tech = id.split('.')[1] + ' dry/wet for ' + tr.title.toLowerCase(); p.plainFull = titleCase(id.split('.')[1]) + ' · ' + tr.title + ' dry/wet'; p.plainDesc = 'How much of this track goes through the effect'; p.desc = 'Dry ink to wet ink: how much of this chapter goes through the effect'; }
     else if (p.group.startsWith('lfo')) p.groupLit = 'Muse ' + ['I', 'II', 'III', 'IV'][+p.group.slice(3)];
     else if (GROUP_LIT[p.group]) p.groupLit = GROUP_LIT[p.group];
+    if (p.group === 'gran') p.plainGroupName = 'Granular';
   });
+  const PLAIN_NAMES = { 'gran.size': 'Size', 'gran.sizernd': 'Size ±', 'gran.detune': 'Scatter', 'gran.amprnd': 'Amp ±', 'gran.fenv': 'Env Amt', 'fx.reverb.damp': 'Damping' };
+  P.get('fx.delay.fb').plainShort = 'Fdbk'; // the dial is narrow; the glossary and tooltip still say Feedback
+  for (const id in PLAIN_NAMES) P.get(id).plainName = PLAIN_NAMES[id];
 
   BBB.anySolo = () => S.tracks.some((t) => t.solo);
   BBB.trackAudible = (t) => !t.mute && (!BBB.anySolo() || t.solo);

@@ -570,3 +570,52 @@ select { font: 600 13px var(--serif); border-radius: 2px; border-color: var(--ha
 .lfo-shape { max-width: 74px; }
 input[type=checkbox] { accent-color: #8a6a2a; width: 15px; height: 15px; }
 .modal select { font: 600 14px var(--serif); }
+
+/* ---------- Literary ⇄ Plain switch ---------- */
+.lexicon { display: flex; align-items: stretch; height: 28px; border: 1px solid var(--hair); border-radius: 14px; padding: 2px;
+  background: linear-gradient(180deg, #220d0a, #3a1612); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 1px 0 rgba(255, 255, 255, .06); }
+.lex-opt { border: none; background: transparent; color: rgba(234, 211, 156, .55); cursor: pointer; border-radius: 12px; padding: 0 10px; transition: background .15s, color .15s; }
+.lex-opt.lit { font: 400 13px var(--script); }
+.lex-opt.plain { font: 700 10.5px var(--serif); letter-spacing: .14em; }
+.lex-opt:hover { color: var(--gold-hi); }
+.lex-opt.on { background: linear-gradient(180deg, #f3dc9f, #c49c48 60%, #a8812f); color: #24170f; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55), 0 1px 2px rgba(0, 0, 0, .5); }
+
+/* ---------- Plain mode: engraved roman capitals instead of the script hand ---------- */
+body.plain .k-label { font: 700 9.5px var(--serif); letter-spacing: .1em; text-transform: uppercase; height: 16px; line-height: 17px; }
+body.plain .topbar .k-label { font-size: 9px; height: 14px; line-height: 15px; }
+body.plain .btn, body.plain .tbtn, body.plain .shape, body.plain .tab { font-family: var(--serif); font-weight: 700; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+body.plain .ftypes .shape, body.plain .lfo-idbot .shape { font-size: 9.5px; }
+body.plain .btn.accent { font-size: 11px; }
+body.plain .panel-title { font: 600 18px var(--serif); letter-spacing: .14em; text-transform: uppercase; }
+body.plain .editor .panel-title { font-size: 16px; }
+body.plain .gsec-title, body.plain .gsel-lbl, body.plain .oct-title, body.plain .bpm-lbl { font: 700 10px var(--serif); letter-spacing: .12em; text-transform: uppercase; }
+body.plain .gsec-title { line-height: 18px; }
+body.plain .lfo-name { font: 700 12px var(--serif); letter-spacing: .12em; text-transform: uppercase; }
+body.plain .fxm-name { font: 700 12px var(--serif); letter-spacing: .12em; text-transform: uppercase; }
+body.plain .fxm-tech { display: none; }
+body.plain .pad .tname { font: 700 15px var(--serif); letter-spacing: .1em; text-transform: uppercase; }
+body.plain .gcount span { font: 600 italic 12px var(--serif); }
+
+/* glossary in the Index */
+.gloss-title { margin: 14px 0 6px; font: 400 17px var(--script); color: var(--ink); border-top: 1px solid var(--rule); padding-top: 10px; }
+body.plain .gloss-title { font: 700 12px var(--serif); letter-spacing: .12em; text-transform: uppercase; }
+.glossary { columns: 2; column-gap: 22px; max-height: 210px; overflow-y: auto; padding-right: 4px; }
+.gloss-row { display: flex; justify-content: space-between; gap: 8px; break-inside: avoid; padding: 2px 0; border-bottom: 1px dotted var(--rule); font-size: 14px; }
+.gl-lit { font: 400 13px var(--script); color: var(--ink); white-space: nowrap; }
+.gl-plain { font: 700 11px var(--serif); letter-spacing: .06em; color: var(--ink-soft); text-transform: uppercase; text-align: right; }
+.modal { max-height: 92vh; overflow-y: auto; }
+/* top bar fits beside the macOS traffic lights at 1440px */
+.topbar { gap: 8px; }
+.brand .logo { font-size: 21px; }
+.brand .sub { font-size: 12px; }
+.rec-clock { min-width: 0; }
+.rec-clock:empty { display: none; }
+.meter { width: 84px; }
+.tbtn { padding: 0 10px; }
+.autobox, .transport { gap: 5px; }
+.lex-opt { padding: 0 8px; }
+body.plain .editor .panel-title { font-size: 14px; letter-spacing: .1em; }
+body.plain .editor .head-btns .btn { font-size: 9.5px; letter-spacing: .08em; padding: 2px 5px 3px; }
+.fxm { min-height: 66px; flex: 1 0 auto; }
+.lfo { min-height: 58px; }
+.fx-grid, .lfo-grid { min-height: auto; }

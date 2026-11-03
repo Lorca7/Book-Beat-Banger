@@ -40,32 +40,44 @@
   const playBtn = BBB.el('button', { class: 'tbtn play', title: 'Play / Stop (Space)', html: '<svg viewBox="0 0 20 20"><path d="M5 3 L17 10 L5 17 Z"/></svg>' });
   const stopBtn = BBB.el('button', { class: 'tbtn', title: 'Stop', html: '<svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="1"/></svg>' });
   const recBtn = BBB.el('button', { class: 'tbtn rec', title: 'Record — captures the master output to a WAV file (starts playback). Press again to stop and save.', html: '<span class="rec-dot"></span><span>Record</span>' });
+  BBB.term(recBtn.lastChild, 'Record', 'Rec');
   const recTime = BBB.el('span', { class: 'mono rec-clock' });
   const autoBtn = BBB.el('button', { class: 'tbtn auto', title: 'Annotate (automation write): while playing, dial movements are written into automation lanes, and pads and keys are written into the pattern (quantized).', html: '<span class="auto-dot"></span><span>Annotate</span>' });
+  BBB.term(autoBtn.lastChild, 'Annotate', 'Automation');
   const autoBars = BBB.el('select', { class: 'mini-sel', title: 'Automation loop length' }, [1, 2, 4, 8].map((b) => BBB.el('option', { value: b, text: b + (b === 1 ? ' bar' : ' bars') })));
-  const autoClear = BBB.el('button', { class: 'btn tiny', text: 'Erase', title: 'Erase all annotations (automation)' });
+  const autoClear = BBB.el('button', { class: 'btn tiny', term: ['Erase', 'Clear'], title: 'Erase all annotations (clear all automation)' });
   const bpmIn = BBB.el('input', { class: 'bpm-in mono', type: 'number', min: 40, max: 240, step: 1, value: S.bpm });
-  const bpmBox = BBB.el('div', { class: 'bpm', title: 'Tempo — drag ↕ on the label or type' }, [BBB.el('span', { class: 'bpm-lbl', text: 'Tempo' }), bpmIn]);
+  const bpmBox = BBB.el('div', { class: 'bpm', title: 'Tempo — drag ↕ on the label or type' }, [BBB.el('span', { class: 'bpm-lbl', term: ['Tempo', 'BPM'] }), bpmIn]);
   const posEl = BBB.el('div', { class: 'pos mono', text: '1.1.1' });
   const swingK = new BBB.Knob(BBB.param('master.swing'), { size: 30, small: true });
   const volK = new BBB.Knob(BBB.param('master.vol'), { size: 30, small: true });
-  const meter = BBB.el('canvas', { class: 'meter', width: 192, height: 56 });
-  const libBtn = BBB.el('button', { class: 'btn library', text: 'Library ▾', title: 'New, open and save projects · shortcuts' });
+  const meter = BBB.el('canvas', { class: 'meter', width: 168, height: 56 });
+  const libBtn = BBB.el('button', { class: 'btn library', term: ['Library ▾', 'File ▾'], title: 'New, open and save projects · shortcuts' });
   libBtn.addEventListener('click', () => {
     const r = libBtn.getBoundingClientRect();
     BBB.contextMenu(r.left, r.bottom + 4, [
-      { label: 'Begin a new volume   ⌘N', fn: () => newProject() },
-      { label: 'Open a volume…   ⌘O', fn: () => openProject() },
-      { label: 'Save this volume…   ⌘S', fn: () => saveProject() },
+      { label: BBB.t('Begin a new volume', 'New project') + '   ⌘N', fn: () => newProject() },
+      { label: BBB.t('Open a volume…', 'Open project…') + '   ⌘O', fn: () => openProject() },
+      { label: BBB.t('Save this volume…', 'Save project…') + '   ⌘S', fn: () => saveProject() },
       { sep: true },
-      { label: 'Publish as WAV…   ⌘E', fn: () => showExport() },
-      { label: 'Index of shortcuts', fn: () => showHelp() }
+      { label: BBB.t('Publish as WAV…', 'Export WAV…') + '   ⌘E', fn: () => showExport() },
+      { label: BBB.t('Index & glossary', 'Help & glossary'), fn: () => showHelp() }
     ]);
   });
   const fileBtns = BBB.el('div', { class: 'file-btns' }, [
     libBtn,
-    BBB.el('button', { class: 'btn accent', text: 'Publish', title: 'Publish — render the song to a WAV file (⌘E)', onclick: () => showExport() })
+    BBB.el('button', { class: 'btn accent', term: ['Publish', 'Export WAV'], title: 'Publish — render the song to a WAV file (⌘E)', onclick: () => showExport() })
   ]);
+  // Literary ⇄ plain switch
+  const litBtn = BBB.el('button', { class: 'lex-opt lit', text: 'Literary', title: 'Show the literary names (L)' });
+  const plainBtn = BBB.el('button', { class: 'lex-opt plain', text: 'PLAIN', title: 'Show the plain technical names (L)' });
+  const lexicon = BBB.el('div', { class: 'lexicon', title: 'Switch every label between the literary names and the plain technical names (L)' }, [litBtn, plainBtn]);
+  litBtn.addEventListener('click', () => BBB.setPlain(false));
+  plainBtn.addEventListener('click', () => BBB.setPlain(true));
+  const syncLexicon = () => { litBtn.classList.toggle('on', !BBB.plain); plainBtn.classList.toggle('on', BBB.plain); };
+  BBB.on('terms', syncLexicon);
+  syncLexicon();
+  document.body.classList.toggle('plain', BBB.plain);
   app.appendChild(BBB.el('header', { class: 'topbar leather spine' }, [
     BBB.el('div', { class: 'brand' }, [
       BBB.el('div', { class: 'logo', html: 'Book <i>Beat</i> Banger' }),
@@ -77,6 +89,7 @@
     BBB.el('div', { class: 'master-knobs' }, [swingK.el, volK.el]),
     meter,
     BBB.el('div', { class: 'spacer' }),
+    lexicon,
     fileBtns
   ]));
 
@@ -134,15 +147,15 @@
   app.appendChild(bottom);
   const editor = (BBB.editor = new BBB.SampleEditor(bottom));
   const fx = BBB.el('div', { class: 'panel fx leather binding-navy' });
-  fx.appendChild(BBB.el('div', { class: 'panel-head' }, [BBB.el('div', { class: 'panel-title', html: 'Effects' }), BBB.el('div', { class: 'hint', text: 'dry ink ↔ wet ink, chapter by chapter' })]));
+  fx.appendChild(BBB.el('div', { class: 'panel-head' }, [BBB.el('div', { class: 'panel-title', html: 'Effects' }), BBB.el('div', { class: 'hint', term: ['dry ink ↔ wet ink, chapter by chapter', 'dry / wet per track'] })]));
   const fxGrid = BBB.el('div', { class: 'fx-grid' });
   fxGrid.appendChild(BBB.el('div', { class: 'fx-colhead' }, [
-    BBB.el('span', { text: '' }), BBB.el('span', { text: 'Particulars' }),
+    BBB.el('span', { text: '' }), BBB.el('span', { term: ['Particulars', 'Settings'] }),
     BBB.el('span', { class: 'mixhead' }, S.tracks.map((t) => BBB.el('span', { text: t.short, style: { color: t.color }, title: t.name + ' dry/wet' })))
   ]));
   BBB.FX.forEach((f) => {
     const m = BBB.el('div', { class: 'fxm' });
-    const head = BBB.el('div', { class: 'fxm-head', title: f.lit + ' — ' + f.name.toLowerCase() }, [BBB.el('span', { class: 'fxm-name', text: f.lit }), BBB.el('span', { class: 'fxm-tech', text: f.name.toLowerCase() })]);
+    const head = BBB.el('div', { class: 'fxm-head', title: f.lit + ' — ' + f.name.toLowerCase() }, [BBB.el('span', { class: 'fxm-name', term: [f.lit, f.name.charAt(0) + f.name.slice(1).toLowerCase()] }), BBB.el('span', { class: 'fxm-tech', text: f.name.toLowerCase() })]);
     if (f.id === 'filter') {
       const types = [['lowpass', 'LP'], ['bandpass', 'BP'], ['highpass', 'HP']];
       const tb = BBB.el('div', { class: 'ftypes' });
@@ -206,12 +219,12 @@
         const c = new AudioBuffer({ numberOfChannels: buf.numberOfChannels, length: maxLen, sampleRate: buf.sampleRate });
         for (let ch = 0; ch < buf.numberOfChannels; ch++) c.copyToChannel(buf.getChannelData(ch).subarray(0, maxLen), ch);
         buf = c;
-        BBB.toast('Abridged to sixty seconds');
+        BBB.toast(BBB.t('Abridged to sixty seconds', 'Long file truncated to 60 s'));
       }
       const t = S.tracks[i];
       t.sample.setRaw(buf, { name: file.name.replace(/\.[^.]+$/, ''), custom: true, autoTrim: t.kind === 'drum' });
       editor.select(i); editor.fitRegion();
-      BBB.toast(`Borrowed “${file.name}” for ${t.title}`);
+      BBB.toast(BBB.t(`Borrowed “${file.name}” for ${t.title}`, `Loaded “${file.name}” into ${t.title}`));
     } catch (e) {
       console.error(e);
       BBB.toast('Could not decode that file (try WAV, MP3, M4A, FLAC or OGG)', 'err');
@@ -286,7 +299,7 @@
   // ---- automation ----
   autoBtn.addEventListener('click', () => { S.auto.rec = !S.auto.rec; autoBtn.classList.toggle('on', S.auto.rec); });
   autoBars.addEventListener('change', () => BBB.setAutoBars(+autoBars.value));
-  autoClear.addEventListener('click', () => { BBB.clearAllLanes(); BBB.toast('Annotations erased'); });
+  autoClear.addEventListener('click', () => { BBB.clearAllLanes(); BBB.toast(BBB.t('Annotations erased', 'Automation cleared')); });
   const lastIdx = {};
   BBB.on('touch', (p, down) => { if (!down) delete lastIdx[p.id]; });
   function writeAutomation() {
@@ -370,10 +383,11 @@
     }
     if (s.custom) {
       g.font = `20px ${T.script}`; g.textAlign = 'right';
-      g.fillStyle = T.marker; g.fillText('in your own hand', W - 8, 26); g.textAlign = 'left';
+      g.fillStyle = T.marker; g.fillText(BBB.t('in your own hand', 'recorded'), W - 8, 26); g.textAlign = 'left';
     }
   }
   BBB.on('sample', (slot) => { const i = S.tracks.findIndex((t) => t.sample === slot); if (i >= 0) drawThumb(i); });
+  BBB.on('terms', () => S.tracks.forEach((t, i) => drawThumb(i)));
   S.tracks.forEach((t, i) => drawThumb(i));
 
   // ---- hit LEDs ----
@@ -449,7 +463,7 @@
   });
   function openProject() { projIn.click(); }
   async function newProject() {
-    if (!window.confirm('Begin a new volume? Unsaved pages will be lost.')) return;
+    if (!window.confirm(BBB.t('Begin a new volume? Unsaved pages will be lost.', 'Start a new project? Unsaved changes will be lost.'))) return;
     const blank = serialize();
     BBB.params.forEach((p, id) => { blank.params[id] = p.defNorm; });
     blank.tracks.forEach((t) => {
@@ -484,14 +498,14 @@
     const status = BBB.el('div', { class: 'status' });
     const body = BBB.el('div', { class: 'form' }, [
       BBB.el('label', {}, ['Length', bars]), BBB.el('label', {}, ['Sample rate', sr]), BBB.el('label', {}, ['Bit depth', bits]),
-      BBB.el('label', { class: 'chk' }, [tail, 'Let the echoes finish (reverb & delay tails)']),
-      BBB.el('p', { class: 'note', text: 'Renders the pattern with all automation and LFO modulation, faster than real time. To capture a live performance (mutes, dial tweaks, keys), use Record in the top bar instead.' }),
+      BBB.el('label', { class: 'chk' }, [tail, BBB.t('Let the echoes finish (reverb & delay tails)', 'Include reverb & delay tails')]),
+      BBB.el('p', { class: 'note', text: BBB.t('Typesets', 'Renders') + ' the pattern with all automation and LFO modulation, faster than real time. To capture a live performance (mutes, dial tweaks, keys), use Record in the top bar instead.' }),
       status
     ]);
-    const go = BBB.el('button', { class: 'btn accent', text: 'Typeset & Save' });
-    const ov = modal('Publish', body, [BBB.el('button', { class: 'btn', text: 'Not yet', onclick: () => ov.remove() }), go]);
+    const go = BBB.el('button', { class: 'btn accent', text: BBB.t('Typeset & Save', 'Render & Save') });
+    const ov = modal(BBB.t('Publish', 'Export WAV'), body, [BBB.el('button', { class: 'btn', text: BBB.t('Not yet', 'Cancel'), onclick: () => ov.remove() }), go]);
     go.addEventListener('click', async () => {
-      go.disabled = true; status.textContent = 'Typesetting…';
+      go.disabled = true; status.textContent = BBB.t('Typesetting…', 'Rendering…');
       try {
         const t0 = performance.now();
         const buf = await BBB.renderOffline({ bars: +bars.value, tail: tail.checked, sampleRate: +sr.value });
@@ -505,27 +519,61 @@
   }
   BBB.showExport = showExport;
 
+  // UI vocabulary (beyond the dials) for the glossary
+  const GLOSSARY = [
+    ['Dictate', 'Record a sample'], ['Await a Voice', 'Auto-start recording'], ['Read Aloud / Hush', 'Preview / stop'],
+    ['Abridge', 'Auto trim'], ['Even Out', 'Normalize'], ['Backwards', 'Reverse'], ['Borrow…', 'Load file'],
+    ['1st Edition', 'Factory sound'], ['Copy Out', 'Save sample as WAV'], ['Manuscript', 'Sample editor'],
+    ['Annotate', 'Automation write'], ['Erase', 'Clear automation'], ['Publish', 'Export WAV'], ['Library', 'File menu'],
+    ['Tempo (top bar)', 'BPM'], ['The Muses', 'LFOs'], ['Muse I–IV', 'LFO 1–4'], ['Chance', 'Sample & hold'], ['Reverie', 'Drift (smooth random)'],
+    ['Dog-ear', 'Freeze'], ['Mode', 'Scale quantize'], ['Free verse', 'No quantize'], ['Voice', 'Pitch section'],
+    ['Narrative Arc', 'Envelope (ADSR)'], ['Editing', 'Filter section'], ['Delivery', 'Output section'], ['Turn page', 'Octave view'],
+    ['Purple Prose', 'Drive'], ['Redaction', 'Filter'], ['Footnotes', 'Delay'], ['Reading Room', 'Reverb'], ['Dry ink ↔ wet ink', 'Dry / wet']
+  ];
+  function glossaryRows() {
+    const seen = new Set(), rows = [];
+    BBB.params.forEach((p) => {
+      if (!p.lit || p.group === 'mix') return;
+      const k = p.lit + '|' + p.plainLabel;
+      if (p.lit === p.plainLabel || seen.has(k)) return;
+      seen.add(k); rows.push([p.lit, p.plainLabel]);
+    });
+    return rows.concat(GLOSSARY).sort((x, y) => x[0].localeCompare(y[0]));
+  }
   function showHelp() {
     const rowsH = [
       ['Space', 'Play / stop'], ['1 · 2 · 3', 'Play kick / snare / hi-hat'], ['A W S E D F T G Y H U J K', 'Play the granular synth chromatically'],
       ['Z / X', 'Keyboard octave down / up'], ['R', 'Record a sample into the selected track'], ['P', 'Preview the selected sample'],
-      ['Esc', 'Cancel a dictation'], ['⌘S · ⌘O · ⌘E · ⌘N', 'Save · Open · Publish · New volume']
+      ['L', BBB.t('Switch between literary and plain names', 'Switch between plain and literary names')],
+      ['Esc', 'Cancel recording'], ['⌘S · ⌘O · ⌘E · ⌘N', 'Save · Open · Export WAV · New']
     ];
-    const tips = [
+    const tips = BBB.plain ? [
+      'Record a sample: press ● on a track, or Record in the Sample editor. With Auto-start on, recording begins when you make a sound. It is auto-trimmed and ready to play at once.',
+      'Sample editor: drag the red flags to trim and the round handles to set fades. Drag across the waveform to choose a new region; scroll to zoom.',
+      'Steps: drag across them to paint. Option-drag up or down on a step sets its velocity.',
+      'Granular piano roll: click to add a note and drag right to lengthen it. Drag a note to move it, or drag its right edge to resize. Click a note to delete it.',
+      'Granular: click the grain-window picture to change its shape. Scatter plus a Scale gives in-key pitch clouds. Freeze holds the position. The Sample editor shows every grain as it sounds.',
+      'LFOs: drag an LFO handle onto any knob to modulate it, then drag its target tag left or right to set the depth. Right-click a knob for more.',
+      'Automation + play: knob moves are recorded as automation (loop length is selectable), and pads and keys are written into the pattern.',
+      'Rec captures a live performance to WAV. Export WAV renders a chosen number of bars offline.'
+    ] : [
       'Dictate: press ● on a chapter, or Dictate on the Manuscript. With “Await a Voice” on, recording begins when you make a sound. It is abridged (auto-trimmed) and ready to play at once.',
       'Manuscript: drag the red ribbons to trim and the wax seals to set fades. Drag across the page to choose a new passage; scroll to zoom.',
       'Steps: drag across them to paint. Option-drag up or down on a step sets its velocity.',
       'Granular piano roll: click to write a note and drag right to lengthen it. Drag a note to move it, or drag its right edge to resize. Click a note to strike it out.',
-      'Granular: click the grain-window picture to change its shape. Digression with a Mode gives in-key pitch clouds. Dog-ear holds the Page still. The Manuscript shows every grain as it sounds.',
+      'Granular: click the grain-window picture to change its shape. An Aside with a Mode gives in-key pitch clouds. Dog-ear holds the Page still. The Manuscript shows every grain as it sounds.',
       'The Muses are LFOs. Drag a Muse onto any dial to inspire it, then drag its note left or right to set the depth. Right-click a dial for more.',
       'Annotate + play: dial movements become automation (loop length is selectable), and pads and keys are written into the pattern.',
-      'Record captures a live performance to WAV. Publish renders a chosen number of bars offline.'
+      'Record captures a live performance to WAV. Publish renders a chosen number of bars offline.',
+      'Lost in the prose? Press Plain in the top bar (or L) to see what everything actually does.'
     ];
-
-    modal('Index', BBB.el('div', { class: 'help' }, [
+    const gl = glossaryRows();
+    modal(BBB.t('Index', 'Help'), BBB.el('div', { class: 'help' }, [
       BBB.el('table', {}, rowsH.map(([k, v]) => BBB.el('tr', {}, [BBB.el('td', { class: 'kbd', text: k }), BBB.el('td', { text: v })]))),
-      BBB.el('ul', {}, tips.map((t) => BBB.el('li', { text: t })))
-    ]), [BBB.el('button', { class: 'btn', text: 'Close the book', onclick: (e) => e.target.closest('.modal-ov').remove() })]);
+      BBB.el('ul', {}, tips.map((t) => BBB.el('li', { text: t }))),
+      BBB.el('div', { class: 'gloss-title', text: 'Glossary — literary name → what it does' }),
+      BBB.el('div', { class: 'glossary' }, gl.map(([l, p]) => BBB.el('div', { class: 'gloss-row' }, [BBB.el('span', { class: 'gl-lit', text: l }), BBB.el('span', { class: 'gl-plain', text: p })])))
+    ]), [BBB.el('button', { class: 'btn', text: BBB.t('Close the book', 'Close'), onclick: (e) => e.target.closest('.modal-ov').remove() })]);
   }
 
   // ---------------- keyboard ----------------
@@ -555,7 +603,8 @@
     if (k === 'x') { kbOct = Math.min(96, kbOct + 12); BBB.toast('Keyboard octave C' + (kbOct / 12 - 1)); return; }
     if (k === 'r') { editor.toggleRec(); return; }
     if (k === 'p') { editor.togglePreview(); return; }
-    if (e.key === 'Escape' && BBB.mic.state !== 'idle') { BBB.mic.cancel(); BBB.toast('Recording cancelled'); }
+    if (k === 'l') { BBB.setPlain(!BBB.plain); BBB.toast(BBB.t('The literary edition', 'Plain technical names')); return; }
+    if (e.key === 'Escape' && BBB.mic.state !== 'idle') { BBB.mic.cancel(); BBB.toast(BBB.t('Dictation abandoned', 'Recording cancelled')); }
   });
   window.addEventListener('keyup', (e) => {
     const k = e.key.toLowerCase();

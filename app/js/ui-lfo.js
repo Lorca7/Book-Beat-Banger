@@ -7,14 +7,15 @@
     constructor(host) {
       this.el = BBB.el('div', { class: 'panel lfos leather binding-green' });
       this.el.appendChild(BBB.el('div', { class: 'panel-head' }, [
-        BBB.el('div', { class: 'panel-title', html: 'The Muses' }),
-        BBB.el('div', { class: 'hint', text: 'LFOs · drag a muse onto any dial' })
+        BBB.el('div', { class: 'panel-title', term: ['The Muses', 'LFOs'] }),
+        BBB.el('div', { class: 'hint', term: ['LFOs · drag a muse onto any dial', 'drag a handle onto any knob'] })
       ]));
       const grid = BBB.el('div', { class: 'lfo-grid' });
       this.cards = [0, 1, 2, 3].map((i) => this.makeCard(i, grid));
       this.el.appendChild(grid);
       host.appendChild(this.el);
       BBB.on('mods', () => this.renderTargets());
+      BBB.on('terms', () => this.renderTargets());
       this.renderTargets();
     }
 
@@ -24,10 +25,11 @@
       const handle = BBB.el('div', { class: 'lfo-handle', title: 'Drag this muse onto any dial to inspire (modulate) it', text: '✒' });
       const scope = BBB.el('canvas', { class: 'lfo-scope', width: 240, height: 80, title: 'Click to change the waveform' });
       const shapeBtn = BBB.el('button', { class: 'shape on lfo-shape', title: 'Waveform' });
-      const pickShape = (x, y) => BBB.contextMenu(x, y, BBB.LFO_SHAPES.map(([id, label]) => ({
-        label: label + (L.shape === id ? '  ✓' : ''), color, fn: () => { L.shape = id; showShape(); BBB.emit('lfo'); }
+      const pickShape = (x, y) => BBB.contextMenu(x, y, BBB.LFO_SHAPES.map(([id, label, plain]) => ({
+        label: BBB.t(label, plain) + (L.shape === id ? '  ✓' : ''), color, fn: () => { L.shape = id; showShape(); BBB.emit('lfo'); }
       })));
-      const showShape = () => { shapeBtn.textContent = (BBB.LFO_SHAPES.find((x) => x[0] === L.shape) || ['', '?'])[1] ; };
+      const showShape = () => { const sh = BBB.LFO_SHAPES.find((x) => x[0] === L.shape) || ['', '?', '?']; shapeBtn.textContent = BBB.t(sh[1], sh[2]); };
+      BBB.on('terms', showShape);
       shapeBtn.addEventListener('click', (e) => { const r = shapeBtn.getBoundingClientRect(); pickShape(r.left, r.bottom + 2); });
       scope.addEventListener('click', () => {
         const k = BBB.LFO_SHAPES.findIndex((x) => x[0] === L.shape);
@@ -45,7 +47,7 @@
       knobHost.appendChild(divK.el); knobHost.appendChild(hzK.el); knobHost.appendChild(phK.el);
       const targets = BBB.el('div', { class: 'targets' });
       card.appendChild(BBB.el('div', { class: 'lfo-id' }, [
-        BBB.el('div', { class: 'lfo-idtop' }, [BBB.el('div', { class: 'lfo-name', text: BBB.MUSES[i], title: 'LFO ' + (i + 1) }), handle]),
+        BBB.el('div', { class: 'lfo-idtop' }, [BBB.el('div', { class: 'lfo-name', term: [BBB.MUSES[i], 'LFO ' + (i + 1)], title: 'LFO ' + (i + 1) }), handle]),
         BBB.el('div', { class: 'lfo-idbot' }, [sync, shapeBtn])
       ]));
       card.appendChild(scope);
@@ -100,7 +102,7 @@
             const id = hover.dataset.param;
             const ok = BBB.addMod(i, id, 0.25);
             const p = BBB.param(id);
-            BBB.toast(ok ? `${BBB.MUSES[i]} now inspires ${p.fullName}` : `${BBB.MUSES[i]} already inspires ${p.fullName}`);
+            BBB.toast(ok ? BBB.t(`${BBB.MUSES[i]} now inspires ${p.fullName}`, `LFO ${i + 1} → ${p.fullName}`) : BBB.t(`${BBB.MUSES[i]} already inspires ${p.fullName}`, `LFO ${i + 1} already modulates ${p.fullName}`));
             hover.classList.add('drop-flash');
             const h = hover;
             setTimeout(() => h.classList.remove('drop-flash'), 500);
@@ -118,7 +120,7 @@
         const host = c.targets;
         host.innerHTML = '';
         const mods = S.mods.filter((m) => m.lfo === i);
-        if (!mods.length) { host.appendChild(BBB.el('div', { class: 'empty', text: 'awaiting a subject' })); return; }
+        if (!mods.length) { host.appendChild(BBB.el('div', { class: 'empty', text: BBB.t('awaiting a subject', 'no targets') })); return; }
         mods.forEach((m) => {
           const p = BBB.param(m.param);
           const bar = BBB.el('div', { class: 'chip-bar' });
@@ -129,7 +131,7 @@
             bar.style.left = (m.depth >= 0 ? 50 : 50 - w) + '%'; bar.style.width = w + '%';
           };
           show();
-          const chip = BBB.el('div', { class: 'chip', title: p.fullName + '\nDrag ↔ to set the depth · double-click for 25% · × dismisses' }, [
+          const chip = BBB.el('div', { class: 'chip', title: p.fullName + BBB.t('\nDrag ↔ to set the depth · double-click for 25% · × dismisses', '\nDrag ↔ to set the modulation depth · double-click for 25% · × removes') }, [
             bar, BBB.el('span', { class: 'chip-name', text: p.fullName, style: { color: p.trackColor || (BBB.TRACKS.some((t) => t.id === p.group) ? p.color : BBB.THEME.ink) } }), val,
             BBB.el('button', { class: 'x', text: '×', title: 'Remove', onclick: (e) => { e.stopPropagation(); BBB.removeMod(i, m.param); } })
           ]);

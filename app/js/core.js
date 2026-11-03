@@ -52,6 +52,25 @@
   BBB.off = (evt, fn) => { const l = listeners[evt]; if (l) { const i = l.indexOf(fn); if (i >= 0) l.splice(i, 1); } };
   BBB.emit = (evt, ...args) => { const l = listeners[evt]; if (l) l.slice().forEach((fn) => fn(...args)); };
 
+  // ---------- Literary ⇄ plain terminology ----------
+  // Every literary label has a plain technical twin. BBB.plain switches between them.
+  BBB.plain = false;
+  try { BBB.plain = localStorage.getItem('bbb.plain') === '1'; } catch (e) { /* storage unavailable */ }
+  BBB.t = (lit, plain) => (BBB.plain ? plain : lit);
+  /** Bind an element's text to a literary/plain pair; it updates whenever the mode changes. */
+  BBB.term = (el, lit, plain) => {
+    el.dataset.lit = lit; el.dataset.plain = plain;
+    el.textContent = BBB.t(lit, plain);
+    return el;
+  };
+  BBB.setPlain = (on) => {
+    BBB.plain = !!on;
+    try { localStorage.setItem('bbb.plain', BBB.plain ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+    document.body.classList.toggle('plain', BBB.plain);
+    document.querySelectorAll('[data-plain]').forEach((el) => { el.textContent = BBB.plain ? el.dataset.plain : el.dataset.lit; });
+    BBB.emit('terms', BBB.plain);
+  };
+
   // ---------- DOM helper ----------
   BBB.el = (tag, attrs, children) => {
     const e = document.createElement(tag);
@@ -65,6 +84,7 @@
         }
         else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
         else if (k === 'text') e.textContent = v;
+        else if (k === 'term') BBB.term(e, v[0], v[1]);
         else if (k === 'html') e.innerHTML = v;
         else e.setAttribute(k, v === true ? '' : v);
       }

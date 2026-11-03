@@ -18,6 +18,7 @@
 
   BBB.knobs = new Map(); // param id -> Knob[]
   BBB.MUSES = ['Muse I', 'Muse II', 'Muse III', 'Muse IV'];
+  BBB.on('terms', () => BBB.knobs.forEach((list) => list.forEach((k) => k.relabel())));
 
   // Shared gradients for brass (on leather) and ivory enamel (on paper) dial faces.
   let defsDone = false;
@@ -50,16 +51,15 @@
       this.size = opts.size || 44;
       this.color = opts.color || model.color || '#ddd';
       this.isParam = model instanceof BBB.Param;
-      const label = opts.label || model.displayLabel || model.label;
+      this.fixedLabel = opts.label || null;
+      const label = this.fixedLabel || model.displayLabel || model.label;
       const c = this.size / 2;
       this.c = c;
-      const help = this.isParam && model.mod
-        ? '\nDrag ↕ (Shift for fine) · double-click to restore · right-click for more · drop a Muse here to inspire it'
-        : '\nDrag ↕ · double-click to restore';
-      const el = (this.el = BBB.el('div', { class: 'knob' + (opts.small ? ' small' : ''), title: (model.tooltip || model.fullName || label) + help }));
+      const el = (this.el = BBB.el('div', { class: 'knob' + (opts.small ? ' small' : '') }));
+      this.updateTitle();
       el.style.setProperty('--kc', this.color);
       if (this.isParam) { el.dataset.param = model.id; if (model.mod) el.dataset.mod = '1'; }
-      if (!opts.nolabel) el.appendChild(BBB.el('div', { class: 'k-label', text: label }));
+      if (!opts.nolabel) { this.labelEl = BBB.el('div', { class: 'k-label', text: label }); el.appendChild(this.labelEl); }
       const s = (this.svg = svg('svg', { width: this.size, height: this.size, viewBox: `0 0 ${this.size} ${this.size}`, class: 'k-svg' }));
       // geometry of an engraved instrument dial
       const R = c - 1.5;
@@ -102,6 +102,22 @@
       this.updateBadges();
     }
 
+    updateTitle() {
+      const m = this.p;
+      const help = this.isParam && m.mod
+        ? BBB.t('\nDrag ↕ (Shift for fine) · double-click to restore · right-click for more · drop a Muse here to inspire it',
+          '\nDrag ↕ (Shift for fine) · double-click to reset · right-click for options · drop an LFO here to modulate it')
+        : '\nDrag ↕ · double-click to reset';
+      this.el.title = (m.tooltip || m.fullName || m.label) + help;
+    }
+    /** Re-read the label after the literary/plain mode changes. */
+    relabel() {
+      if (this.labelEl && !this.fixedLabel) this.labelEl.textContent = this.p.displayLabel || this.p.label;
+      this.updateTitle();
+      this.last.txt = null;
+      this.updateBadges(true);
+    }
+
     bind() {
       const el = this.el, p = this.p;
       let startY = 0, startN = 0, dragging = false;
@@ -139,30 +155,30 @@
       el.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (!this.isParam) { p.setNorm(p.defNorm); return; }
-        const items = [{ label: 'Restore the original', fn: () => p.setNorm(p.defNorm) }];
-        if (S.auto.lanes[p.id]) items.push({ label: 'Erase annotations (automation)', fn: () => BBB.clearLane(p.id) });
+        const items = [{ label: BBB.t('Restore the original', 'Reset to default'), fn: () => p.setNorm(p.defNorm) }];
+        if (S.auto.lanes[p.id]) items.push({ label: BBB.t('Erase annotations (automation)', 'Clear automation'), fn: () => BBB.clearLane(p.id) });
         if (p.mod) {
           items.push({ sep: true });
           for (let i = 0; i < 4; i++) {
             const has = S.mods.find((m) => m.lfo === i && m.param === p.id);
             items.push(has
-              ? { label: `Dismiss ${BBB.MUSES[i]}`, color: BBB.LFO_COLORS[i], fn: () => BBB.removeMod(i, p.id) }
-              : { label: `Inspire with ${BBB.MUSES[i]}`, color: BBB.LFO_COLORS[i], fn: () => BBB.addMod(i, p.id, 0.25) });
+              ? { label: BBB.t(`Dismiss ${BBB.MUSES[i]}`, `Remove LFO ${i + 1}`), color: BBB.LFO_COLORS[i], fn: () => BBB.removeMod(i, p.id) }
+              : { label: BBB.t(`Inspire with ${BBB.MUSES[i]}`, `Modulate with LFO ${i + 1}`), color: BBB.LFO_COLORS[i], fn: () => BBB.addMod(i, p.id, 0.25) });
           }
         }
         BBB.contextMenu(e.clientX, e.clientY, items);
       });
     }
 
-    updateBadges() {
+    updateBadges(force) {
       if (!this.isParam) return;
       const id = this.p.id, mods = BBB.modsFor(id) || [], lane = S.auto.lanes[id];
       const key = mods.map((m) => m.lfo).join(',') + '|' + (lane ? 1 : 0);
-      if (key === this.badgeKey) return;
+      if (key === this.badgeKey && !force) return;
       this.badgeKey = key;
       this.badges.innerHTML = '';
-      mods.forEach((m) => this.badges.appendChild(BBB.el('span', { class: 'k-dot', style: { background: BBB.LFO_COLORS[m.lfo] }, title: 'Inspired by ' + BBB.MUSES[m.lfo] })));
-      if (lane) this.badges.appendChild(BBB.el('span', { class: 'k-auto', text: '✎', title: 'Annotated (automated) — right-click to erase' }));
+      mods.forEach((m) => this.badges.appendChild(BBB.el('span', { class: 'k-dot', style: { background: BBB.LFO_COLORS[m.lfo] }, title: BBB.t('Inspired by ' + BBB.MUSES[m.lfo], 'Modulated by LFO ' + (m.lfo + 1)) })));
+      if (lane) this.badges.appendChild(BBB.el('span', { class: 'k-auto', text: '✎', title: BBB.t('Annotated (automated) — right-click to erase', 'Automated — right-click to clear') }));
       this.el.classList.toggle('modded', mods.length > 0);
       this.el.classList.toggle('automated', !!lane);
     }

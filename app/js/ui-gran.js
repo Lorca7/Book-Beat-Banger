@@ -7,12 +7,12 @@
     constructor(host) {
       const el = (this.el = BBB.el('div', { class: 'gpanel' }));
       const knob = (k) => new BBB.Knob(BBB.param('gran.' + k), { size: 30, small: true }).el;
-      const section = (title, cls, kids) => BBB.el('div', { class: 'gsec ' + cls }, [BBB.el('div', { class: 'gsec-title', text: title }), BBB.el('div', { class: 'gsec-body' }, kids)]);
+      const section = (title, cls, kids) => BBB.el('div', { class: 'gsec ' + cls }, [BBB.el('div', { class: 'gsec-title', term: title }), BBB.el('div', { class: 'gsec-body' }, kids)]);
 
       // --- cloud ---
-      this.freezeBtn = BBB.el('button', { class: 'btn toggle tiny freeze', text: 'Dog-ear', title: 'Freeze: hold the page in place. Grains keep coming from the current position.' });
+      this.freezeBtn = BBB.el('button', { class: 'btn toggle tiny freeze', term: ['Dog-ear', 'Freeze'], title: 'Dog-ear (freeze): hold the page in place. Grains keep coming from the current position.' });
       this.freezeBtn.addEventListener('click', () => { S.gran.freeze = !S.gran.freeze; this.sync(); });
-      const cloud = section('Cloud', 'g-cloud', [knob('pos'), knob('scan'), knob('spray'), knob('dens'), knob('jitter'), BBB.el('div', { class: 'gsel' }, [this.freezeBtn])]);
+      const cloud = section(['Cloud', 'Cloud'], 'g-cloud', [knob('pos'), knob('scan'), knob('spray'), knob('dens'), knob('jitter'), BBB.el('div', { class: 'gsel' }, [this.freezeBtn])]);
 
       // --- grain window ---
       this.winCanvas = BBB.el('canvas', { class: 'win-view', width: 120, height: 56, title: 'Grain window — the envelope of every grain (click to change)' });
@@ -27,28 +27,29 @@
         S.gran.window = BBB.GRAIN_WINDOWS[(k + 1) % BBB.GRAIN_WINDOWS.length][0];
         this.sync();
       });
-      const grain = section('Grain', 'g-grain', [BBB.el('div', { class: 'gsel win' }, [this.winCanvas, this.winBtn]), knob('size'), knob('sizernd'), knob('skew'), knob('reverse')]);
+      const grain = section(['Grain', 'Grain'], 'g-grain', [BBB.el('div', { class: 'gsel win' }, [this.winCanvas, this.winBtn]), knob('size'), knob('sizernd'), knob('skew'), knob('reverse')]);
 
       // --- pitch ---
       this.quantBtn = BBB.el('button', { class: 'shape on sel-btn', title: 'Mode: quantize the digression (pitch scatter) to a scale' });
       this.quantBtn.addEventListener('click', () => {
         const r = this.quantBtn.getBoundingClientRect();
-        BBB.contextMenu(r.left, r.bottom + 2, BBB.PITCH_QUANT.map(([id, label]) => ({ label: label + (S.gran.quant === id ? '  ✓' : ''), fn: () => { S.gran.quant = id; this.sync(); } })));
+        BBB.contextMenu(r.left, r.bottom + 2, BBB.PITCH_QUANT.map(([id, label, plain]) => ({ label: BBB.t(label, plain || label) + (S.gran.quant === id ? '  ✓' : ''), fn: () => { S.gran.quant = id; this.sync(); } })));
       });
-      const pitch = section('Voice', 'g-pitch', [knob('pitch'), knob('fine'), knob('detune'), BBB.el('div', { class: 'gsel' }, [BBB.el('span', { class: 'gsel-lbl', text: 'Mode' }), this.quantBtn])]);
+      const pitch = section(['Voice', 'Pitch'], 'g-pitch', [knob('pitch'), knob('fine'), knob('detune'), BBB.el('div', { class: 'gsel' }, [BBB.el('span', { class: 'gsel-lbl', term: ['Mode', 'Scale'] }), this.quantBtn])]);
 
       // --- envelope / filter / output ---
       this.envCanvas = BBB.el('canvas', { class: 'env-view', width: 120, height: 56, title: 'Narrative arc — the amplitude envelope (ADSR) of each note' });
-      const env = section('Narrative Arc', 'g-env', [knob('attack'), knob('decay'), knob('sustain'), knob('release'), BBB.el('div', { class: 'gsel' }, [this.envCanvas])]);
-      const filt = section('Editing', 'g-filt', [knob('cutoff'), knob('res'), knob('fenv')]);
-      this.countEl = BBB.el('div', { class: 'gcount', title: 'Grains sounding right now' }, [BBB.el('b', { text: '0' }), BBB.el('span', { text: 'grains aloft' })]);
-      const out = section('Delivery', 'g-out', [knob('level'), knob('pan'), knob('spread'), knob('amprnd'), this.countEl]);
+      const env = section(['Narrative Arc', 'Envelope'], 'g-env', [knob('attack'), knob('decay'), knob('sustain'), knob('release'), BBB.el('div', { class: 'gsel' }, [this.envCanvas])]);
+      const filt = section(['Editing', 'Filter'], 'g-filt', [knob('cutoff'), knob('res'), knob('fenv')]);
+      this.countEl = BBB.el('div', { class: 'gcount', title: 'Grains sounding right now' }, [BBB.el('b', { text: '0' }), BBB.el('span', { term: ['grains aloft', 'grains'] })]);
+      const out = section(['Delivery', 'Output'], 'g-out', [knob('level'), knob('pan'), knob('spread'), knob('amprnd'), this.countEl]);
 
       el.appendChild(cloud); el.appendChild(grain);
       el.appendChild(pitch); el.appendChild(filt);
       el.appendChild(env); el.appendChild(out);
       host.appendChild(el);
       BBB.on('param', (p) => { if (p.id === 'gran.skew') this.drawWindow(); if (/gran\.(attack|decay|sustain|release)/.test(p.id)) this.drawEnv(); });
+      BBB.on('terms', () => this.sync());
       this.sync();
     }
 
@@ -56,7 +57,8 @@
       const G = S.gran;
       this.freezeBtn.classList.toggle('on', G.freeze);
       this.winBtn.textContent = (BBB.GRAIN_WINDOWS.find((w) => w[0] === G.window) || ['', 'Hann'])[1] + ' ▾';
-      this.quantBtn.textContent = (BBB.PITCH_QUANT.find((q) => q[0] === G.quant) || ['', 'Free verse'])[1] + ' ▾';
+      const q = BBB.PITCH_QUANT.find((x) => x[0] === G.quant) || ['', 'Free verse', 'Free'];
+      this.quantBtn.textContent = BBB.t(q[1], q[2] || q[1]) + ' ▾';
       this.drawWindow();
       this.drawEnv();
     }

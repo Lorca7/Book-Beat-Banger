@@ -3,7 +3,7 @@
   'use strict';
   const BBB = window.BBB, U = BBB.util, S = BBB.state;
 
-  const PLAY_LBL = '▶ Read Aloud', STOP_LBL = '■ Hush';
+  const playLbl = () => BBB.t('▶ Read Aloud', '▶ Play'), stopLbl = () => BBB.t('■ Hush', '■ Stop');
   class SampleEditor {
     constructor(host) {
       this.ti = 0;
@@ -15,21 +15,21 @@
       this.fileIn = BBB.el('input', { type: 'file', accept: 'audio/*,.wav,.mp3,.m4a,.aif,.aiff,.flac,.ogg', style: { display: 'none' } });
       this.fileIn.addEventListener('change', () => { if (this.fileIn.files[0]) BBB.loadFileIntoTrack(this.ti, this.fileIn.files[0]); this.fileIn.value = ''; });
       el.appendChild(BBB.el('div', { class: 'panel-head' }, [
-        BBB.el('div', { class: 'panel-title', html: 'Manuscript' }), BBB.el('div', { class: 'tabs' }, this.tabs),
+        BBB.el('div', { class: 'panel-title', term: ['Manuscript', 'Sample Editor'] }), BBB.el('div', { class: 'tabs' }, this.tabs),
         BBB.el('div', { class: 'head-btns' }, [
-          BBB.el('button', { class: 'btn tiny', text: 'Borrow…', title: 'Load an audio file into this track (or drop one on the page)', onclick: () => this.fileIn.click() }),
-          BBB.el('button', { class: 'btn tiny', text: '1st Edition', title: 'First edition — restore the factory sound', onclick: () => this.restoreFactory() }),
-          BBB.el('button', { class: 'btn tiny', text: 'Copy Out', title: 'Save this edited sample as a WAV file', onclick: () => this.exportSample() }),
+          BBB.el('button', { class: 'btn tiny', term: ['Borrow…', 'Load…'], title: 'Load an audio file into this track (or drop one on the page)', onclick: () => this.fileIn.click() }),
+          BBB.el('button', { class: 'btn tiny', term: ['1st Edition', 'Factory'], title: 'First edition — restore the factory sound', onclick: () => this.restoreFactory() }),
+          BBB.el('button', { class: 'btn tiny', term: ['Copy Out', 'Save WAV'], title: 'Save this edited sample as a WAV file', onclick: () => this.exportSample() }),
           this.fileIn
         ])
       ]));
       // canvas
       this.canvas = BBB.el('canvas', { class: 'wave' });
-      this.drop = BBB.el('div', { class: 'wave-wrap page' }, [this.canvas, this.info, BBB.el('div', { class: 'wave-hint', text: 'Drop a sound file to borrow it' })]);
+      this.drop = BBB.el('div', { class: 'wave-wrap page' }, [this.canvas, this.info, BBB.el('div', { class: 'wave-hint', term: ['Drop a sound file to borrow it', 'Drop an audio file to load it'] })]);
       el.appendChild(this.drop);
       // record row
-      this.recBtn = BBB.el('button', { class: 'btn rec', title: 'Dictate — record from the microphone into this track (R)', onclick: () => this.toggleRec() }, [BBB.el('span', { class: 'rec-dot' }), BBB.el('span', { class: 'lbl', text: 'Dictate' })]);
-      this.thrBtn = BBB.el('button', { class: 'btn toggle on', text: 'Await a Voice', title: 'Auto-start: wait for a sound above the threshold before recording begins', onclick: () => { BBB.mic.threshold = !BBB.mic.threshold; this.thrBtn.classList.toggle('on', BBB.mic.threshold); } });
+      this.recBtn = BBB.el('button', { class: 'btn rec', title: 'Dictate — record a sample from the microphone into this track (R)', onclick: () => this.toggleRec() }, [BBB.el('span', { class: 'rec-dot' }), BBB.el('span', { class: 'lbl', text: 'Dictate' })]);
+      this.thrBtn = BBB.el('button', { class: 'btn toggle on', term: ['Await a Voice', 'Auto-start'], title: 'Auto-start: wait for a sound above the threshold before recording begins', onclick: () => { BBB.mic.threshold = !BBB.mic.threshold; this.thrBtn.classList.toggle('on', BBB.mic.threshold); } });
       this.thr = BBB.el('input', { type: 'range', min: -60, max: -6, step: 1, value: -30, class: 'thr', title: 'Await-a-Voice threshold: -30 dB' });
       this.thrLbl = BBB.el('span', { class: 'mono small thr-lbl', text: '-30dB' });
       this.thr.addEventListener('input', () => { BBB.mic.thresholdDb = +this.thr.value; this.thrLbl.textContent = this.thr.value + 'dB'; this.thr.title = 'Await-a-Voice threshold: ' + this.thr.value + ' dB'; });
@@ -40,10 +40,10 @@
       this.recTime = BBB.el('span', { class: 'mono small rec-time' });
       el.appendChild(BBB.el('div', { class: 'ed-row' }, [this.recBtn, this.recTime, this.thrBtn, this.thr, this.thrLbl, this.meter, this.devSel]));
       // edit row
-      this.playBtn = BBB.el('button', { class: 'btn', text: '▶ Read Aloud', title: 'Preview the edited sample (P)', onclick: () => this.togglePreview() });
-      this.trimBtn = BBB.el('button', { class: 'btn', text: 'Abridge', title: 'Auto-trim: find the onset and tail automatically', onclick: () => { this.slot.autoTrim(); this.fitRegion(); } });
-      this.normBtn = BBB.el('button', { class: 'btn toggle', text: 'Even Out', title: 'Normalize the level', onclick: () => { this.slot.normalize = !this.slot.normalize; this.slot.process(); } });
-      this.revBtn = BBB.el('button', { class: 'btn toggle', text: 'Backwards', title: 'Reverse the sample', onclick: () => { this.slot.reverse = !this.slot.reverse; this.slot.process(); } });
+      this.playBtn = BBB.el('button', { class: 'btn', text: playLbl(), title: 'Preview the edited sample (P)', onclick: () => this.togglePreview() });
+      this.trimBtn = BBB.el('button', { class: 'btn', term: ['Abridge', 'Auto Trim'], title: 'Auto-trim: find the onset and tail automatically', onclick: () => { this.slot.autoTrim(); this.fitRegion(); } });
+      this.normBtn = BBB.el('button', { class: 'btn toggle', term: ['Even Out', 'Normalize'], title: 'Normalize the level', onclick: () => { this.slot.normalize = !this.slot.normalize; this.slot.process(); } });
+      this.revBtn = BBB.el('button', { class: 'btn toggle', term: ['Backwards', 'Reverse'], title: 'Reverse the sample', onclick: () => { this.slot.reverse = !this.slot.reverse; this.slot.process(); } });
       const self = this;
       this.gainModel = {
         label: 'Gain', color: '#e6c77d', defNorm: 0.5,
@@ -64,6 +64,7 @@
       BBB.on('sample', (slot) => { if (slot === this.slot) { this.updateInfo(); this.dirty = true; } });
       BBB.on('rec-state', () => this.updateRecUI());
       BBB.on('rec-done', (r) => this.onRecDone(r));
+      BBB.on('terms', () => { this.updateRecUI(); this.playBtn.textContent = BBB.engine.previewing ? stopLbl() : playLbl(); this.dirty = true; });
       this.select(0);
     }
 
@@ -126,10 +127,10 @@
         }
       } else mic.stop();
     }
-    engineStopPreview() { BBB.engine.stopPreview(); this.playBtn.textContent = PLAY_LBL; }
+    engineStopPreview() { BBB.engine.stopPreview(); this.playBtn.textContent = playLbl(); }
 
     onRecDone({ trackId, buffer }) {
-      if (!buffer) { BBB.toast('Not a word was recorded'); return; }
+      if (!buffer) { BBB.toast(BBB.t('Not a word was recorded', 'Nothing was recorded')); return; }
       const ti = S.tracks.findIndex((t) => t.id === trackId);
       const slot = S.tracks[ti].sample;
       slot.setRaw(buffer, { name: 'Rec ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), custom: true, autoTrim: true });
@@ -137,14 +138,14 @@
       this.updateInfo();
       // "ready to use": audition the result immediately
       setTimeout(() => this.preview(), 60);
-      BBB.toast(`Dictation taken — ${S.tracks[ti].title}, edited for length and ready`);
+      BBB.toast(BBB.t(`Dictation taken — ${S.tracks[ti].title}, edited for length and ready`, `Recorded into ${S.tracks[ti].title} — trimmed and ready`));
     }
 
     updateRecUI() {
       const st = BBB.mic.state;
       this.recBtn.classList.toggle('armed', st === 'armed');
       this.recBtn.classList.toggle('recording', st === 'recording');
-      this.recBtn.querySelector('.lbl').textContent = st === 'idle' ? 'Dictate' : st === 'armed' ? 'Listening…' : 'Fin.';
+      this.recBtn.querySelector('.lbl').textContent = st === 'idle' ? BBB.t('Dictate', 'Record') : st === 'armed' ? BBB.t('Listening…', 'Waiting…') : BBB.t('Fin.', 'Stop');
       this.el.classList.toggle('is-recording', st !== 'idle');
       BBB.emit('rec-ui', st, this.ti);
     }
@@ -173,7 +174,7 @@
       if (fromRawSec != null) off = s.reverse ? s.end - fromRawSec : fromRawSec - s.start;
       off = U.clamp(off, 0, s.buffer.duration - 0.001);
       BBB.engine.preview(s.buffer, off);
-      this.playBtn.textContent = STOP_LBL;
+      this.playBtn.textContent = stopLbl();
     }
 
     // ---------------- canvas ----------------
@@ -296,8 +297,8 @@
       this.meter.lastChild.style.left = Math.round(((mic.thresholdDb + 60) / 60) * 100) + '%';
       this.meter.lastChild.style.display = mic.threshold ? '' : 'none';
       this.recTime.textContent = mic.state === 'recording' ? U.fmtClock(mic.seconds) : '';
-      if (eng.previewing === null && this.playBtn.textContent !== PLAY_LBL) this.playBtn.textContent = PLAY_LBL;
-      if (!eng.previewing && this.playBtn.textContent !== PLAY_LBL) this.playBtn.textContent = PLAY_LBL;
+      if (eng.previewing === null && this.playBtn.textContent !== playLbl()) this.playBtn.textContent = playLbl();
+      if (!eng.previewing && this.playBtn.textContent !== playLbl()) this.playBtn.textContent = playLbl();
       const animate = mic.state !== 'idle' || eng.previewing || (this.track.kind === 'granular' && eng.voices.length) || this.track.kind === 'granular';
       if (!this.dirty && !animate) return;
       this.dirty = false;
@@ -370,7 +371,7 @@
         g.fillStyle = T.oxblood; g.beginPath(); g.arc(x, top, 5, 0, Math.PI * 2); g.fill();
         g.fillStyle = T.gold; g.beginPath(); g.arc(x, top, 2, 0, Math.PI * 2); g.fill();
       });
-      if (s.reverse) { g.fillStyle = T.marker; g.font = `italic 600 12px ${T.serif}`; g.fillText('← reversed', Math.max(4, xs + 15), 12); }
+      if (s.reverse) { g.fillStyle = T.marker; g.font = `italic 600 12px ${T.serif}`; g.fillText(BBB.t('← read backwards', '← reversed'), Math.max(4, xs + 15), 12); }
       // granular overlay: position, spray window and the live grain cloud
       if (this.track.kind === 'granular') {
         const now = eng.ctx.currentTime;
@@ -439,7 +440,7 @@
         }
       });
       g.fillStyle = mic.state === 'recording' ? T.marker : T.ink; g.font = `italic 600 13px ${T.serif}`;
-      g.fillText(mic.state === 'armed' ? 'Listening… make a sound to begin recording' : '● Recording into ' + this.track.title + ' — press Stop when done', 8, 14);
+      g.fillText(mic.state === 'armed' ? BBB.t('Listening… speak, sing or strike something to begin', 'Waiting for sound… recording starts when the input crosses the threshold') : BBB.t('● Taking dictation for ' + this.track.title + ' — press Fin. when done', '● Recording into ' + this.track.title + ' — press Stop when done'), 8, 14);
       if (mic.threshold) {
         const ty = U.dbToGain(mic.thresholdDb) * amp;
         g.strokeStyle = 'rgba(168,50,42,0.45)'; g.setLineDash([4, 4]);

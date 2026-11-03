@@ -90,7 +90,7 @@
       const up = BBB.el('button', { class: 'mini', text: '▲', title: 'Scroll up an octave (or use the mouse wheel)', onclick: () => this.shift(12) });
       const dn = BBB.el('button', { class: 'mini', text: '▼', title: 'Scroll down an octave', onclick: () => this.shift(-12) });
       this.rangeLbl = BBB.el('span', { class: 'oct-lbl mono' });
-      this.octEl = BBB.el('div', { class: 'oct-btns' }, [BBB.el('span', { class: 'oct-title', text: 'Turn page' }), dn, up, this.rangeLbl]);
+      this.octEl = BBB.el('div', { class: 'oct-btns' }, [BBB.el('span', { class: 'oct-title', term: ['Turn page', 'Octave'] }), dn, up, this.rangeLbl]);
       this.wrap.appendChild(this.canvas);
       host.appendChild(this.wrap);
       this.ph = null;
