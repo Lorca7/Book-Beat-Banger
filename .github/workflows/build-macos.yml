@@ -19,7 +19,7 @@ jobs:
           node-version: 22
       - name: Install Playwright + Chromium
         run: |
-          npm install --no-save --no-package-lock playwright@1.48.2
+          npm install --no-save --no-package-lock playwright@1.63.0
           npx playwright install --with-deps chromium
       - name: Run smoke test
         run: node scripts/smoke-test.js

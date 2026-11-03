@@ -16,8 +16,17 @@ const { chromium } = require('playwright');
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   const url = 'file://' + path.resolve(__dirname, '..', 'app', 'index.html');
   await page.goto(url);
-  await page.waitForFunction(() => window.BBB && window.BBB.ready, null, { timeout: 20000 });
+  // Poll with page.evaluate (not waitForFunction, which some Playwright versions run via eval — blocked by the app's CSP).
+  const waitFor = async (fn, timeout) => {
+    const end = Date.now() + (timeout || 10000);
+    for (;;) {
+      if (await page.evaluate(fn).catch(() => false)) return;
+      if (Date.now() > end) throw new Error('timed out waiting for ' + fn.toString());
+      await page.waitForTimeout(100);
+    }
+  };
   const ok = (cond, msg) => { if (!cond) { throw new Error('FAIL: ' + msg); } console.log('  ✓ ' + msg); };
+  await waitFor(() => !!(window.BBB && window.BBB.ready), 20000);
 
   // ---- playback ----
   await page.mouse.click(5, 300); // user gesture
@@ -73,7 +82,7 @@ const { chromium } = require('playwright');
   // ---- mic recording into the hi-hat track (fake device = beep) ----
   await page.keyboard.press('Space'); // stop
   await page.click('.track:nth-child(3) .recmini');
-  await page.waitForFunction(() => BBB.mic.state !== 'idle', null, { timeout: 5000 });
+  await waitFor(() => BBB.mic.state !== 'idle', 5000);
   await page.waitForTimeout(1600);
   if (shots) await page.screenshot({ path: path.join(shots, '03-recording.png') });
   const recState = await page.evaluate(() => BBB.mic.state);
